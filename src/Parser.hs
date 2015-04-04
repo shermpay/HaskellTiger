@@ -49,11 +49,12 @@ parseTypeField = do
   spaces
   return (ident, typeId)
 
+parseTypeFields :: Parser [(Id, Type)]
+parseTypeFields = parseTypeField `sepBy` (char ',' >> spaces)
+
 parseTypeRecord :: Parser Type
 parseTypeRecord = do
-  char '{' >> spaces
-  record <- parseTypeField `sepBy` (char ',' >> spaces)
-  char '}'
+  record <- between (char '{' >> spaces) (char '}') parseTypeFields 
   return $ RecordType record
 
 parseTypeArray :: Parser Type
@@ -111,6 +112,36 @@ readVarDecl input =
     case parse parseVarDecl lang input of
       Left err -> show err
       Right val -> show val
+
+-------------------------------------
+-- Function/Procedure Declarations --
+-------------------------------------
+data FunctionType = FuncType ([(Id, Type)] , Type)
+                  | ProcType [(Id, Type)]
+                    deriving (Show, Eq)
+
+type FunctionDecl = (FunctionType, Expr)
+                    
+parseFunctionDecl :: Parser FunctionDecl
+parseFunctionDecl = do
+  string "function" >> spaces
+  ident <- parseId
+  paramDecl <- between (spaces >> char '(' >> spaces) (spaces >> char ')' >> spaces) 
+               parseTypeFields
+  retType <- optionMaybe $ try parseTypeAnn
+  spaces >> (char '=') >> spaces
+  body <- parseExpr
+  return $ (case retType of
+              Nothing -> ProcType paramDecl
+              Just ret -> FuncType (paramDecl, ret)
+           , body)
+
+readFunctionDecl :: String -> String
+readFunctionDecl input =
+    case parse parseFunctionDecl lang input of
+      Left err -> show err
+      Right val -> show val
+
 -----------------
 -- Expressions --
 -----------------
