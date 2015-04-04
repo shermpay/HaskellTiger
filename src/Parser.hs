@@ -1,4 +1,5 @@
 import Control.Monad
+import Control.Applicative ((<$>))
 import Text.ParserCombinators.Parsec
     
 lang = "tiger"
@@ -6,11 +7,6 @@ lang = "tiger"
 type Id = String
 type Comment = String
     
-data Type = Type Id                 -- Simple Type
-          | RecordType [(Id, Type)] -- Record Type (Field, Type)
-          | ArrayType Type
-            deriving (Show, Eq)
-
 parseId :: Parser Id
 parseId = do
   first <- letter
@@ -33,6 +29,14 @@ readComment input =
     case parse parseComment lang input of
       Left err -> show err
       Right val -> val
+                   
+-----------------------
+-- Type Declarations --
+-----------------------
+data Type = Type Id                 -- Simple Type
+          | RecordType [(Id, Type)] -- Record Type (Field, Type)
+          | ArrayType Type
+            deriving (Show, Eq)
 
 parseTypeId :: Parser Type
 parseTypeId = liftM Type parseId 
@@ -76,3 +80,41 @@ readTypeDecl input =
     case parse parseTypeDecl lang input of
       Left err -> show err
       Right val -> show val
+
+---------------------------
+-- Variable Declarations --
+---------------------------
+data VarDecl = VarDecl {varName :: Id
+                       , varType :: Maybe Type
+                       , varExpr :: Expr} deriving (Show)
+
+             
+parseTypeAnn :: Parser Type
+parseTypeAnn = do
+  char ':' >> spaces
+  typeId <- parseTypeId
+  spaces
+  return typeId
+
+parseVarDecl :: Parser VarDecl
+parseVarDecl = do
+  string "var" >> spaces
+  ident <- parseId
+  spaces
+  varT <- optionMaybe $ try parseTypeAnn
+  (string ":=") >> spaces
+  expr <- parseExpr
+  return VarDecl {varName=ident, varType=varT, varExpr=expr}
+
+readVarDecl :: String -> String
+readVarDecl input =
+    case parse parseVarDecl lang input of
+      Left err -> show err
+      Right val -> show val
+-----------------
+-- Expressions --
+-----------------
+data Expr = Var Id
+          deriving Show
+parseExpr :: Parser Expr
+parseExpr = liftM Var parseId
