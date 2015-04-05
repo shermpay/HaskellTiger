@@ -33,15 +33,17 @@ readComment input =
 -----------------------
 -- Type Declarations --
 -----------------------
+type FieldType = (Id, Type)
+type RecordType = [FieldType]
 data Type = Type Id                 -- Simple Type
-          | RecordType [(Id, Type)] -- Record Type (Field, Type)
+          | RecordType RecordType -- Record Type (Field, Type)
           | ArrayType Type
             deriving (Show, Eq)
 
 parseTypeId :: Parser Type
 parseTypeId = liftM Type parseId 
 
-parseTypeField :: Parser (Id, Type)
+parseTypeField :: Parser FieldType
 parseTypeField = do
   ident <- parseId
   spaces >> char ':' >> spaces
@@ -49,7 +51,7 @@ parseTypeField = do
   spaces
   return (ident, typeId)
 
-parseTypeFields :: Parser [(Id, Type)]
+parseTypeFields :: Parser RecordType
 parseTypeFields = parseTypeField `sepBy` (char ',' >> spaces)
 
 parseTypeRecord :: Parser Type
@@ -68,7 +70,7 @@ parseTypeVal = parseTypeArray
     <|> parseTypeId
     <|> parseTypeRecord
 
-parseTypeDecl :: Parser (Id, Type) 
+parseTypeDecl :: Parser FieldType 
 parseTypeDecl = do
   string "type" >> spaces
   ident <- parseId 
@@ -116,8 +118,8 @@ readVarDecl input =
 -------------------------------------
 -- Function/Procedure Declarations --
 -------------------------------------
-data FunctionType = FuncType ([(Id, Type)] , Type)
-                  | ProcType [(Id, Type)]
+data FunctionType = FuncType (RecordType , Type)
+                  | ProcType RecordType
                     deriving (Show, Eq)
 
 type FunctionDecl = (FunctionType, Expr)
@@ -141,7 +143,44 @@ readFunctionDecl input =
     case parse parseFunctionDecl lang input of
       Left err -> show err
       Right val -> show val
+                   
+--------------
+-- L-Values --
+--------------
+{-
+  lvalue -> id
+         -> lvalue . id
+         -> lvalue [ exp ]
+  
+  Left Recursion:
+  lvalue -> id deref
+  deref  -> . id deref
+         -> [ exp ] deref
+         -> epsilon
+-}
+data LValue = LVar Id
+            | FieldDeref LValue LValue -- (Record, Field)
+            | ArraySub LValue Expr
+              deriving (Show)
 
+parseLValue :: Parser LValue
+parseLValue =
+    parseLVar `chainl1` parseFieldDeref
+
+parseFieldDeref :: Parser (LValue -> LValue -> LValue)
+parseFieldDeref = do
+  spaces >> (char '.') >> spaces
+  return FieldDeref
+         
+parseLVar :: Parser LValue
+parseLVar = liftM LVar parseId
+
+readLValue :: String -> String
+readLValue input =
+    case parse parseLValue lang input of
+      Left err -> show err
+      Right val -> show val
+  
 -----------------
 -- Expressions --
 -----------------
