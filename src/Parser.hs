@@ -118,7 +118,7 @@ readVarDecl input =
 -------------------------------------
 -- Function/Procedure Declarations --
 -------------------------------------
-data FunctionType = FuncType (RecordType , Type)
+data FunctionType = FuncType RecordType Type
                   | ProcType RecordType
                     deriving (Show, Eq)
 
@@ -135,7 +135,7 @@ parseFunctionDecl = do
   body <- parseExpr
   return $ (case retType of
               Nothing -> ProcType paramDecl
-              Just ret -> FuncType (paramDecl, ret)
+              Just ret -> FuncType paramDecl ret
            , body)
 
 readFunctionDecl :: String -> String
