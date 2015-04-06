@@ -71,7 +71,7 @@ parseTypeField = do
   return (ident, typeId)
 
 parseTypeFields :: Parser RecordType
-parseTypeFields = parseTypeField `sepBy` (char ',' >> spaces)
+parseTypeFields = commaSep parseTypeField 
 
 parseTypeRecord :: Parser Type
 parseTypeRecord = do
