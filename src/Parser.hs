@@ -205,9 +205,9 @@ readLValue input =
 -----------------
 -- Expressions --
 -----------------
-data Op = Plus
-        | Minus
-        | Times
+data Op = Add
+        | Sub
+        | Mult
         | Div
         | Eq
         | NE
@@ -223,12 +223,12 @@ data Expr = Var Id
           | FieldDeref Expr Expr -- (Record, Field)
           | ArraySub Expr Expr
           | Nil
-          | IntLit Integer
+          | IntConst Integer
           | StringLit String
           | SeqExpr [Expr]
           | Neg Expr
           | Call Expr [Expr]
-          | Infix Expr Op Expr
+          | InfixOp Op Expr Expr
           | NewArr Type Expr Expr
           | NewRec Type [FieldInit]
           | Assign Expr Expr
@@ -268,11 +268,20 @@ parseCall funcName = do
   args <- parens $ commaSep parseExpr
   return $ Call funcName args
 
+operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
+            , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
+            , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
+            , [Infix  (reservedOp "-"   >> return (InfixOp Sub )) AssocLeft]
+            ]
+
 parseExpr :: Parser Expr
-parseExpr = parseIdExpr 
+parseExpr = buildExpressionParser operators parseGenExpr
+
+parseGenExpr :: Parser Expr
+parseGenExpr = parseIdExpr 
             -- Parses LValues and Funcalls
             <|> do { (reserved "nil"); return Nil }
-            <|> do { val <- natural; return $ IntLit val }
+            <|> do { val <- natural; return $ IntConst val }
             <|> do { val <- stringLiteral; return $ StringLit val }
             <|> parseSeqExpr
             <|> parseNeg
