@@ -34,6 +34,7 @@ lexer@Tok.TokenParser { Tok.identifier = identifier
                       , Tok.braces = braces
                       , Tok.brackets = brackets
                       , Tok.comma = comma
+                      , Tok.dot = dot
                       , Tok.colon = colon
                       , Tok.commaSep = commaSep
                       , Tok.commaSep1 = commaSep1 } = Tok.makeTokenParser def
@@ -65,9 +66,8 @@ parseTypeId = liftM Type identifier
 parseTypeField :: Parser FieldType
 parseTypeField = do
   ident <- identifier
-  spaces >> char ':' >> spaces
+  reservedOp ":"
   typeId <- parseTypeId
-  spaces
   return (ident, typeId)
 
 parseTypeFields :: Parser RecordType
@@ -80,7 +80,7 @@ parseTypeRecord = do
 
 parseTypeArray :: Parser Type
 parseTypeArray = do
-  string "array of" >> spaces
+  reserved "array of"
   typeId <- parseTypeId
   return $ ArrayType typeId
 
@@ -91,9 +91,9 @@ parseTypeVal = parseTypeArray
 
 parseTypeDecl :: Parser FieldType 
 parseTypeDecl = do
-  string "type" >> spaces
+  reserved "type"
   ident <- identifier 
-  spaces >> char '=' >> spaces
+  reservedOp "="
   typeVal <- parseTypeVal
   return $ (ident, typeVal)
 
@@ -112,18 +112,16 @@ data VarDecl = VarDecl {varName :: Id
              
 parseTypeAnn :: Parser Type
 parseTypeAnn = do
-  char ':' >> spaces
+  reservedOp ":"
   typeId <- parseTypeId
-  spaces
   return typeId
 
 parseVarDecl :: Parser VarDecl
 parseVarDecl = do
-  string "var" >> spaces
+  reserved "var"
   ident <- identifier
-  spaces
   varT <- optionMaybe $ try parseTypeAnn
-  (string ":=") >> spaces
+  reservedOp ":="
   expr <- parseExpr
   return VarDecl {varName=ident, varType=varT, varExpr=expr}
 
@@ -144,11 +142,11 @@ type FunctionDecl = (FunctionType, Expr)
                     
 parseFunctionDecl :: Parser FunctionDecl
 parseFunctionDecl = do
-  string "function" >> spaces
+  reserved "function"
   ident <- identifier
   paramDecl <- parens parseTypeFields
   retType <- optionMaybe $ try parseTypeAnn
-  spaces >> (char '=') >> spaces
+  reservedOp "="
   body <- parseExpr
   return $ (case retType of
               Nothing -> ProcType paramDecl
@@ -186,7 +184,7 @@ parseLValue =
 
 parseFieldDeref :: Parser (LValue -> LValue -> LValue)
 parseFieldDeref = do
-  spaces >> (char '.') >> spaces
+  dot
   return FieldDeref
          
 parseLVar :: Parser LValue
