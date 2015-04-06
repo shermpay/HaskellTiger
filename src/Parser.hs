@@ -30,6 +30,7 @@ lexer@Tok.TokenParser { Tok.identifier = identifier
                       , Tok.reservedOp = reservedOp
                       , Tok.charLiteral = charLiteral
                       , Tok.stringLiteral = stringLiteral
+                      , Tok.natural = natural
                       , Tok.integer = integer
                       , Tok.symbol = symbol
                       , Tok.lexeme = lexeme
@@ -40,6 +41,7 @@ lexer@Tok.TokenParser { Tok.identifier = identifier
                       , Tok.comma = comma
                       , Tok.dot = dot
                       , Tok.colon = colon
+                      , Tok.semiSep = semiSep
                       , Tok.commaSep = commaSep
                       , Tok.commaSep1 = commaSep1 } = Tok.makeTokenParser def
              
@@ -171,8 +173,7 @@ readFunctionDecl input =
          -> epsilon
 -}
 parseLValue :: Parser Expr
-parseLValue =
-    parseVarOrSub `chainl1` parseFieldDeref
+parseLValue = parseVarOrSub `chainl1` parseFieldDeref
 
 parseFieldDeref :: Parser (Expr -> Expr -> Expr)
 parseFieldDeref = do
@@ -226,11 +227,10 @@ data Expr = Var Id
           | StringLit String
           | SeqExpr [Expr]
           | Neg Expr
-          | Call [Expr]
+          | Call Expr [Expr]
           | Infix Expr Op Expr
           | NewArr Type Expr Expr
-          | NewRec Type Expr
-          | NewField Id Expr
+          | NewRec Type [FieldInit]
           | Assign Expr Expr
           | If { ifExpr :: Expr, thenExpr :: Expr,  elseExpr :: Expr }
           | While Expr Expr
@@ -239,11 +239,43 @@ data Expr = Var Id
           | Let [Decl] [Expr]
           deriving Show
                    
+type FieldInit = (Id, Expr)
+
+parseIdExpr :: Parser Expr
+parseIdExpr = 
+    parseVarOrSubOrCall `chainl1` parseFieldDeref
+
+parseVarOrSubOrCall :: Parser Expr
+parseVarOrSubOrCall = do
+  var <- parseVar
+  sub <- optionMaybe $ parseArraySub var
+  case sub of
+    Just e -> return e
+    Nothing -> do 
+             call <- optionMaybe $ parseCall var
+             case call of
+               Just e -> return e
+               Nothing -> return var
+                   
+parseSeqExpr :: Parser Expr
+parseSeqExpr = do { exprs <- parens $ semiSep parseExpr; return $ SeqExpr exprs }
+
+parseNeg :: Parser Expr
+parseNeg = do { reservedOp "-"; expr <- parseExpr ; return $ Neg expr }
+
+parseCall :: Expr -> Parser Expr
+parseCall funcName = do
+  args <- parens $ commaSep parseExpr
+  return $ Call funcName args
+
 parseExpr :: Parser Expr
-parseExpr = parseLValue
+parseExpr = parseIdExpr 
+            -- Parses LValues and Funcalls
             <|> do { (reserved "nil"); return Nil }
-            <|> do { val <- integer; return $ IntLit val }
+            <|> do { val <- natural; return $ IntLit val }
             <|> do { val <- stringLiteral; return $ StringLit val }
+            <|> parseSeqExpr
+            <|> parseNeg
 
 readExpr :: String -> String
 readExpr input = 
