@@ -177,12 +177,25 @@ readFunctionDecl input =
 -}
 parseLValue :: Parser Expr
 parseLValue =
-    parseVar `chainl1` parseFieldDeref
+    parseVarOrSub `chainl1` parseFieldDeref
 
 parseFieldDeref :: Parser (Expr -> Expr -> Expr)
 parseFieldDeref = do
   dot
   return FieldDeref
+
+parseVarOrSub :: Parser Expr
+parseVarOrSub = do
+  var <- parseVar
+  sub <- optionMaybe $ parseArraySub var
+  case sub of
+    Just e -> return e
+    Nothing -> return var
+
+parseArraySub :: Expr -> Parser Expr
+parseArraySub var = do
+  expr <- brackets parseExpr
+  return $ ArraySub var expr
          
 parseVar :: Parser Expr
 parseVar = liftM Var identifier
@@ -232,4 +245,4 @@ data Expr = Var Id
           deriving Show
 
 parseExpr :: Parser Expr
-parseExpr = parseVar
+parseExpr = parseLValue
