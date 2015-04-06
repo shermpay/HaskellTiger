@@ -30,6 +30,7 @@ lexer@Tok.TokenParser { Tok.identifier = identifier
                       , Tok.reservedOp = reservedOp
                       , Tok.charLiteral = charLiteral
                       , Tok.stringLiteral = stringLiteral
+                      , Tok.integer = integer
                       , Tok.symbol = symbol
                       , Tok.lexeme = lexeme
                       , Tok.whiteSpace = whiteSpace
@@ -47,12 +48,6 @@ lang = "tiger"
 type Id = String
 type Comment = String
     
-readExpr :: String -> String
-readExpr input = 
-    case parse identifier lang input of
-      Left err -> show err
-      Right val -> val
-                   
 data Decl = VarDecl {varName :: Id
                      , varType :: Maybe Type
                      , varExpr :: Expr}
@@ -227,7 +222,7 @@ data Expr = Var Id
           | FieldDeref Expr Expr -- (Record, Field)
           | ArraySub Expr Expr
           | Nil
-          | IntLit Int
+          | IntLit Integer
           | StringLit String
           | SeqExpr [Expr]
           | Neg Expr
@@ -243,6 +238,15 @@ data Expr = Var Id
           | Break
           | Let [Decl] [Expr]
           deriving Show
-
+                   
 parseExpr :: Parser Expr
 parseExpr = parseLValue
+            <|> do { (reserved "nil"); return Nil }
+            <|> do { val <- integer; return $ IntLit val }
+            <|> do { val <- stringLiteral; return $ StringLit val }
+
+readExpr :: String -> String
+readExpr input = 
+    case parse parseExpr lang input of
+      Left err -> show err
+      Right val -> show val
