@@ -1,7 +1,43 @@
 import Control.Monad
 import Control.Applicative ((<$>))
-import Text.ParserCombinators.Parsec
-    
+import Text.Parsec
+import Text.Parsec.String
+import Text.Parsec.Expr
+-- import Text.ParserCombinators.Parsec
+import qualified Text.Parsec.Token as Tok
+
+def = Tok.LanguageDef { Tok.commentStart = "/*"
+                      , Tok.commentEnd = "*/"
+                      , Tok.commentLine = ""
+                      , Tok.nestedComments = True
+                      , Tok.identStart = letter :: Parser Char
+                      , Tok.identLetter = (alphaNum <|> char '_')
+                      , Tok.opStart = oneOf ":="
+                      , Tok.opLetter = oneOf "="
+                      , Tok.reservedNames = 
+                          ["type", "array", "of", "function", "var", "nil", "break"
+                          , "if", "then", "else", "while", "for", "to", "do"
+                          , "let", "in", "end"]
+                      , Tok.reservedOpNames = [":", ":=", ".", "=", "-"]
+                      , Tok.caseSensitive = True}
+           
+Tok.TokenParser { Tok.identifier = identifier
+                , Tok.reserved = reserved
+                , Tok.operator = operator
+                , Tok.reservedOp = reservedOp
+                , Tok.charLiteral = charLiteral
+                , Tok.stringLiteral = stringLiteral
+                , Tok.symbol = symbol
+                , Tok.lexeme = lexeme
+                , Tok.whiteSpace = whiteSpace
+                , Tok.parens = parens 
+                , Tok.braces = braces
+                , Tok.brackets = brackets
+                , Tok.comma = comma
+                , Tok.colon = colon
+                , Tok.commaSep = commaSep
+                , Tok.commaSep1 = commaSep1 } = Tok.makeTokenParser def
+             
 lang = "tiger"
        
 type Id = String
@@ -90,7 +126,6 @@ readTypeDecl input =
 data VarDecl = VarDecl {varName :: Id
                        , varType :: Maybe Type
                        , varExpr :: Expr} deriving (Show)
-
              
 parseTypeAnn :: Parser Type
 parseTypeAnn = do
