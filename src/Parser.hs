@@ -21,48 +21,31 @@ def = Tok.LanguageDef { Tok.commentStart = "/*"
                       , Tok.reservedOpNames = [":", ":=", ".", "=", "-"]
                       , Tok.caseSensitive = True}
            
-Tok.TokenParser { Tok.identifier = identifier
-                , Tok.reserved = reserved
-                , Tok.operator = operator
-                , Tok.reservedOp = reservedOp
-                , Tok.charLiteral = charLiteral
-                , Tok.stringLiteral = stringLiteral
-                , Tok.symbol = symbol
-                , Tok.lexeme = lexeme
-                , Tok.whiteSpace = whiteSpace
-                , Tok.parens = parens 
-                , Tok.braces = braces
-                , Tok.brackets = brackets
-                , Tok.comma = comma
-                , Tok.colon = colon
-                , Tok.commaSep = commaSep
-                , Tok.commaSep1 = commaSep1 } = Tok.makeTokenParser def
+lexer@Tok.TokenParser { Tok.identifier = identifier
+                      , Tok.reserved = reserved
+                      , Tok.operator = operator
+                      , Tok.reservedOp = reservedOp
+                      , Tok.charLiteral = charLiteral
+                      , Tok.stringLiteral = stringLiteral
+                      , Tok.symbol = symbol
+                      , Tok.lexeme = lexeme
+                      , Tok.whiteSpace = whiteSpace
+                      , Tok.parens = parens 
+                      , Tok.braces = braces
+                      , Tok.brackets = brackets
+                      , Tok.comma = comma
+                      , Tok.colon = colon
+                      , Tok.commaSep = commaSep
+                      , Tok.commaSep1 = commaSep1 } = Tok.makeTokenParser def
              
 lang = "tiger"
        
 type Id = String
 type Comment = String
     
-parseId :: Parser Id
-parseId = do
-  first <- letter
-  rest <- many (alphaNum <|> char '_')
-  return (first:rest)
-
-parseComment :: Parser Comment
-parseComment = do
-  string "/*" 
-  manyTill anyChar (try $ string "*/")
-
 readExpr :: String -> String
 readExpr input = 
-    case parse parseId lang input of
-      Left err -> show err
-      Right val -> val
-
-readComment :: String -> String
-readComment input = 
-    case parse parseComment lang input of
+    case parse identifier lang input of
       Left err -> show err
       Right val -> val
                    
@@ -77,11 +60,11 @@ data Type = Type Id                 -- Simple Type
             deriving (Show, Eq)
 
 parseTypeId :: Parser Type
-parseTypeId = liftM Type parseId 
+parseTypeId = liftM Type identifier 
 
 parseTypeField :: Parser FieldType
 parseTypeField = do
-  ident <- parseId
+  ident <- identifier
   spaces >> char ':' >> spaces
   typeId <- parseTypeId
   spaces
@@ -92,7 +75,7 @@ parseTypeFields = parseTypeField `sepBy` (char ',' >> spaces)
 
 parseTypeRecord :: Parser Type
 parseTypeRecord = do
-  record <- between (char '{' >> spaces) (char '}') parseTypeFields 
+  record <- braces parseTypeFields 
   return $ RecordType record
 
 parseTypeArray :: Parser Type
@@ -109,7 +92,7 @@ parseTypeVal = parseTypeArray
 parseTypeDecl :: Parser FieldType 
 parseTypeDecl = do
   string "type" >> spaces
-  ident <- parseId 
+  ident <- identifier 
   spaces >> char '=' >> spaces
   typeVal <- parseTypeVal
   return $ (ident, typeVal)
@@ -137,7 +120,7 @@ parseTypeAnn = do
 parseVarDecl :: Parser VarDecl
 parseVarDecl = do
   string "var" >> spaces
-  ident <- parseId
+  ident <- identifier
   spaces
   varT <- optionMaybe $ try parseTypeAnn
   (string ":=") >> spaces
@@ -162,9 +145,8 @@ type FunctionDecl = (FunctionType, Expr)
 parseFunctionDecl :: Parser FunctionDecl
 parseFunctionDecl = do
   string "function" >> spaces
-  ident <- parseId
-  paramDecl <- between (spaces >> char '(' >> spaces) (spaces >> char ')' >> spaces) 
-               parseTypeFields
+  ident <- identifier
+  paramDecl <- parens parseTypeFields
   retType <- optionMaybe $ try parseTypeAnn
   spaces >> (char '=') >> spaces
   body <- parseExpr
@@ -208,7 +190,7 @@ parseFieldDeref = do
   return FieldDeref
          
 parseLVar :: Parser LValue
-parseLVar = liftM LVar parseId
+parseLVar = liftM LVar identifier
 
 readLValue :: String -> String
 readLValue input =
@@ -222,4 +204,4 @@ readLValue input =
 data Expr = Var Id
           deriving Show
 parseExpr :: Parser Expr
-parseExpr = liftM Var parseId
+parseExpr = liftM Var identifier
