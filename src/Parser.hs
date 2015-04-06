@@ -175,21 +175,16 @@ readFunctionDecl input =
          -> [ exp ] deref
          -> epsilon
 -}
-data LValue = Var Id
-            | FieldDeref LValue LValue -- (Record, Field)
-            | ArraySub LValue Expr
-              deriving (Show)
-
-parseLValue :: Parser LValue
+parseLValue :: Parser Expr
 parseLValue =
     parseVar `chainl1` parseFieldDeref
 
-parseFieldDeref :: Parser (LValue -> LValue -> LValue)
+parseFieldDeref :: Parser (Expr -> Expr -> Expr)
 parseFieldDeref = do
   dot
   return FieldDeref
          
-parseVar :: Parser LValue
+parseVar :: Parser Expr
 parseVar = liftM Var identifier
 
 readLValue :: String -> String
@@ -215,7 +210,9 @@ data Op = Plus
         | Or
         deriving Show
 
-data Expr = LValExpr LValue
+data Expr = Var Id
+          | FieldDeref Expr Expr -- (Record, Field)
+          | ArraySub Expr Expr
           | Nil
           | IntLit Int
           | StringLit String
@@ -226,11 +223,13 @@ data Expr = LValExpr LValue
           | NewArr Type Expr Expr
           | NewRec Type Expr
           | NewField Id Expr
-          | Assign LValue Expr
+          | Assign Expr Expr
           | If { ifExpr :: Expr, thenExpr :: Expr,  elseExpr :: Expr }
-          | While Expr  Expr
+          | While Expr Expr
           | For { forVarName :: Id, forVarExpr :: Expr, toExpr :: Expr, doExpr :: Expr }
+          | Break
+          | Let [Decl] [Expr]
           deriving Show
 
 parseExpr :: Parser Expr
-parseExpr = liftM (LValExpr . Var) identifier
+parseExpr = parseVar
