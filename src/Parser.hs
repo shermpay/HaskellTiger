@@ -12,13 +12,16 @@ def = Tok.LanguageDef { Tok.commentStart = "/*"
                       , Tok.nestedComments = True
                       , Tok.identStart = letter :: Parser Char
                       , Tok.identLetter = (alphaNum <|> char '_')
-                      , Tok.opStart = oneOf ":="
-                      , Tok.opLetter = oneOf "="
+                      , Tok.opStart = oneOf ":=.-+-*/<>&|"
+                      , Tok.opLetter = oneOf ":=.-+-*/<>&|"
                       , Tok.reservedNames = 
                           ["type", "array", "of", "function", "var", "nil", "break"
                           , "if", "then", "else", "while", "for", "to", "do"
                           , "let", "in", "end"]
-                      , Tok.reservedOpNames = [":", ":=", ".", "=", "-"]
+                      , Tok.reservedOpNames = [":", ":=", ".", "-"
+                                              , "+", "-", "*", "/"
+                                              , "=", "<>", ">", "<", "<=", ">="
+                                              , "&", "|"]
                       , Tok.caseSensitive = True}
            
 lexer@Tok.TokenParser { Tok.identifier = identifier
@@ -50,6 +53,12 @@ readExpr input =
       Left err -> show err
       Right val -> val
                    
+data Decl = VarDecl {varName :: Id
+                     , varType :: Maybe Type
+                     , varExpr :: Expr}
+          | FunctionDecl FunctionType Expr
+          | TypeDecl Type
+          deriving Show
 -----------------------
 -- Type Declarations --
 -----------------------
@@ -106,17 +115,13 @@ readTypeDecl input =
 ---------------------------
 -- Variable Declarations --
 ---------------------------
-data VarDecl = VarDecl {varName :: Id
-                       , varType :: Maybe Type
-                       , varExpr :: Expr} deriving (Show)
-             
 parseTypeAnn :: Parser Type
 parseTypeAnn = do
   reservedOp ":"
   typeId <- parseTypeId
   return typeId
 
-parseVarDecl :: Parser VarDecl
+parseVarDecl :: Parser Decl
 parseVarDecl = do
   reserved "var"
   ident <- identifier
@@ -134,13 +139,11 @@ readVarDecl input =
 -------------------------------------
 -- Function/Procedure Declarations --
 -------------------------------------
-data FunctionType = FuncType RecordType Type
-                  | ProcType RecordType
+data FunctionType = FuncType Id RecordType Type
+                  | ProcType Id RecordType
                     deriving (Show, Eq)
 
-type FunctionDecl = (FunctionType, Expr)
-                    
-parseFunctionDecl :: Parser FunctionDecl
+parseFunctionDecl :: Parser Decl
 parseFunctionDecl = do
   reserved "function"
   ident <- identifier
@@ -148,10 +151,9 @@ parseFunctionDecl = do
   retType <- optionMaybe $ try parseTypeAnn
   reservedOp "="
   body <- parseExpr
-  return $ (case retType of
-              Nothing -> ProcType paramDecl
-              Just ret -> FuncType paramDecl ret
-           , body)
+  return $ FunctionDecl (case retType of
+                           Nothing -> ProcType ident paramDecl
+                           Just ret -> FuncType ident paramDecl ret) body
 
 readFunctionDecl :: String -> String
 readFunctionDecl input =
@@ -173,22 +175,22 @@ readFunctionDecl input =
          -> [ exp ] deref
          -> epsilon
 -}
-data LValue = LVar Id
+data LValue = Var Id
             | FieldDeref LValue LValue -- (Record, Field)
             | ArraySub LValue Expr
               deriving (Show)
 
 parseLValue :: Parser LValue
 parseLValue =
-    parseLVar `chainl1` parseFieldDeref
+    parseVar `chainl1` parseFieldDeref
 
 parseFieldDeref :: Parser (LValue -> LValue -> LValue)
 parseFieldDeref = do
   dot
   return FieldDeref
          
-parseLVar :: Parser LValue
-parseLVar = liftM LVar identifier
+parseVar :: Parser LValue
+parseVar = liftM Var identifier
 
 readLValue :: String -> String
 readLValue input =
@@ -199,7 +201,36 @@ readLValue input =
 -----------------
 -- Expressions --
 -----------------
-data Expr = Var Id
+data Op = Plus
+        | Minus
+        | Times
+        | Div
+        | Eq
+        | NE
+        | LT
+        | LTE
+        | GT
+        | GTE
+        | And
+        | Or
+        deriving Show
+
+data Expr = LValExpr LValue
+          | Nil
+          | IntLit Int
+          | StringLit String
+          | SeqExpr [Expr]
+          | Neg Expr
+          | Call [Expr]
+          | Infix Expr Op Expr
+          | NewArr Type Expr Expr
+          | NewRec Type Expr
+          | NewField Id Expr
+          | Assign LValue Expr
+          | If { ifExpr :: Expr, thenExpr :: Expr,  elseExpr :: Expr }
+          | While Expr  Expr
+          | For { forVarName :: Id, forVarExpr :: Expr, toExpr :: Expr, doExpr :: Expr }
           deriving Show
+
 parseExpr :: Parser Expr
-parseExpr = liftM Var identifier
+parseExpr = liftM (LValExpr . Var) identifier
