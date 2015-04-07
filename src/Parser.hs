@@ -66,70 +66,70 @@ data Type = Type Id                 -- Simple Type
           | ArrayType Type
             deriving (Show, Eq)
 
-parseTypeId :: Parser Type
-parseTypeId = liftM Type identifier 
+typeIdParser :: Parser Type
+typeIdParser = liftM Type identifier 
 
-parseTypeField :: Parser FieldType
-parseTypeField = do
+typeFieldParser :: Parser FieldType
+typeFieldParser = do
   ident <- identifier
   reservedOp ":"
-  typeId <- parseTypeId
+  typeId <- typeIdParser
   return (ident, typeId)
 
-parseTypeFields :: Parser RecordType
-parseTypeFields = commaSep parseTypeField 
+typeFieldsParser :: Parser RecordType
+typeFieldsParser = commaSep typeFieldParser 
 
-parseTypeRecord :: Parser Type
-parseTypeRecord = do
-  record <- braces parseTypeFields 
+typeRecordParser :: Parser Type
+typeRecordParser = do
+  record <- braces typeFieldsParser 
   return $ RecordType record
 
-parseTypeArray :: Parser Type
-parseTypeArray = do
+typeArrayParser :: Parser Type
+typeArrayParser = do
   reserved "array of"
-  typeId <- parseTypeId
+  typeId <- typeIdParser
   return $ ArrayType typeId
 
-parseTypeVal :: Parser Type
-parseTypeVal = parseTypeArray
-    <|> parseTypeId
-    <|> parseTypeRecord
+typeValParser :: Parser Type
+typeValParser = typeArrayParser
+    <|> typeIdParser
+    <|> typeRecordParser
 
-parseTypeDecl :: Parser Decl 
-parseTypeDecl = do
+typeDeclParser :: Parser Decl 
+typeDeclParser = do
   reserved "type"
-  typeId <- parseTypeId
+  typeId <- typeIdParser
   reservedOp "="
-  typeVal <- parseTypeVal
+  typeVal <- typeValParser
   return $ TypeDecl typeId typeVal
 
 readTypeDecl :: String -> String
 readTypeDecl input =
-    case parse parseTypeDecl lang input of
+    case parse typeDeclParser lang input of
       Left err -> show err
       Right val -> show val
 
 ---------------------------
 -- Variable Declarations --
 ---------------------------
-parseTypeAnn :: Parser Type
-parseTypeAnn = do
+typeAnnParser :: Parser Type
+typeAnnParser = do
   reservedOp ":"
-  typeId <- parseTypeId
+  typeId <- typeIdParser
   return typeId
 
-parseVarDecl :: Parser Decl
-parseVarDecl = do
+varDeclParser :: Parser Decl
+varDeclParser = do
   reserved "var"
   ident <- identifier
-  varT <- optionMaybe $ try parseTypeAnn
+  varT <- optionMaybe $ try typeAnnParser
   reservedOp ":="
-  expr <- parseExpr
+  expr <- exprParser
   return VarDecl {varName=ident, varType=varT, varExpr=expr}
 
 readVarDecl :: String -> String
 readVarDecl input =
-    case parse parseVarDecl lang input of
+    case parse varDeclParser lang input of
       Left err -> show err
       Right val -> show val
 
@@ -140,28 +140,28 @@ data FunctionType = FuncType Id RecordType Type
                   | ProcType Id RecordType
                     deriving (Show, Eq)
 
-parseFunctionDecl :: Parser Decl
-parseFunctionDecl = do
+functionDeclParser :: Parser Decl
+functionDeclParser = do
   reserved "function"
   ident <- identifier
-  paramDecl <- parens parseTypeFields
-  retType <- optionMaybe $ try parseTypeAnn
+  paramDecl <- parens typeFieldsParser
+  retType <- optionMaybe $ try typeAnnParser
   reservedOp "="
-  body <- parseExpr
+  body <- exprParser
   return $ FunctionDecl (case retType of
                            Nothing -> ProcType ident paramDecl
                            Just ret -> FuncType ident paramDecl ret) body
 
 readFunctionDecl :: String -> String
 readFunctionDecl input =
-    case parse parseFunctionDecl lang input of
+    case parse functionDeclParser lang input of
       Left err -> show err
       Right val -> show val
 
-parseDecl :: Parser Decl
-parseDecl = parseTypeDecl
-            <|> parseVarDecl
-            <|> parseFunctionDecl
+declParser :: Parser Decl
+declParser = typeDeclParser
+            <|> varDeclParser
+            <|> functionDeclParser
                    
 --------------
 -- L-Values --
@@ -177,27 +177,27 @@ parseDecl = parseTypeDecl
          -> [ exp ] deref
          -> epsilon
 -}
-parseLValue :: Parser Expr
-parseLValue = (try parseArraySub <|> parseIdExpr) `chainl1` parseFieldDeref
+lValueParser :: Parser Expr
+lValueParser = (try arraySubParser <|> idExprParser) `chainl1` fieldDerefParser
 
-parseFieldDeref :: Parser (Expr -> Expr -> Expr)
-parseFieldDeref = do
+fieldDerefParser :: Parser (Expr -> Expr -> Expr)
+fieldDerefParser = do
   dot
   return FieldDeref
 
-parseArraySub :: Parser Expr
-parseArraySub = do
-  var <- parseIdExpr
-  expr <- brackets parseExpr
+arraySubParser :: Parser Expr
+arraySubParser = do
+  var <- idExprParser
+  expr <- brackets exprParser
   notFollowedBy $ reserved "of"
   return $ ArraySub var expr
          
-parseIdExpr :: Parser Expr
-parseIdExpr = liftM IdExpr identifier
+idExprParser :: Parser Expr
+idExprParser = liftM IdExpr identifier
 
 readLValue :: String -> String
 readLValue input =
-    case parse parseLValue lang input of
+    case parse lValueParser lang input of
       Left err -> show err
       Right val -> show val
   
@@ -241,94 +241,94 @@ data Expr = IdExpr Id
                    
 type FieldInit = (Id, Expr)
 
-parseIdAndExpr :: Parser Expr
-parseIdAndExpr = (try parseArraySub 
-                 <|> (try parseCall) 
-                 <|> (try parseNewArr) 
-                 <|> (try parseNewRec)
-                 <|> (try parseAssign)
-                 <|> parseIdExpr) 
-                 `chainl1` parseFieldDeref
+idAndExprParser :: Parser Expr
+idAndExprParser = (try arraySubParser 
+                 <|> (try callParser) 
+                 <|> (try newArrParser) 
+                 <|> (try newRecParser)
+                 <|> (try assignParser)
+                 <|> idExprParser) 
+                 `chainl1` fieldDerefParser
 
-parseSeqExpr :: Parser Expr
-parseSeqExpr = do { exprs <- parens $ semiSep parseExpr; return $ SeqExpr exprs }
+seqExprParser :: Parser Expr
+seqExprParser = do { exprs <- parens $ semiSep exprParser; return $ SeqExpr exprs }
 
-parseNeg :: Parser Expr
-parseNeg = do { reservedOp "-"; expr <- parseExpr ; return $ Neg expr }
+negParser :: Parser Expr
+negParser = do { reservedOp "-"; expr <- exprParser ; return $ Neg expr }
 
-parseCall :: Parser Expr
-parseCall = do
-  funcName <- parseIdExpr
-  args <- parens $ commaSep parseExpr
+callParser :: Parser Expr
+callParser = do
+  funcName <- idExprParser
+  args <- parens $ commaSep exprParser
   return $ Call funcName args
 
-parseNewArr :: Parser Expr
-parseNewArr = do
-  arrType <- parseTypeId
-  size <- brackets parseExpr
+newArrParser :: Parser Expr
+newArrParser = do
+  arrType <- typeIdParser
+  size <- brackets exprParser
   reserved "of"
-  initVal <- parseExpr
+  initVal <- exprParser
   return $ NewArr {arrayType=arrType, arraySize=size, arrayInit=initVal}
 
-parseFieldInit :: Parser (Id, Expr)
-parseFieldInit = do
+fieldInitParser :: Parser (Id, Expr)
+fieldInitParser = do
     ident <- identifier
     reservedOp "="
-    expr <- parseExpr
+    expr <- exprParser
     return (ident, expr)
         
-parseNewRec :: Parser Expr
-parseNewRec = do
-  recType <- parseTypeId
-  fieldInits <- braces $ commaSep  parseFieldInit
+newRecParser :: Parser Expr
+newRecParser = do
+  recType <- typeIdParser
+  fieldInits <- braces $ commaSep  fieldInitParser
   return $ NewRec recType fieldInits
 
-parseAssign :: Parser Expr
-parseAssign = do
-  var <- parseIdExpr
+assignParser :: Parser Expr
+assignParser = do
+  var <- idExprParser
   reservedOp ":="
-  expr <- parseExpr
+  expr <- exprParser
   return $ Assign var expr
 
-parseIf :: Parser Expr
-parseIf = do
+ifParser :: Parser Expr
+ifParser = do
   reserved "if"
-  ifExpr <- parseExpr
+  ifExpr <- exprParser
   reserved "then"
-  thenExpr <- parseExpr
+  thenExpr <- exprParser
   maybeElse <- optionMaybe $ do { reserved "else";
-                                  elseExpr <- parseExpr;
+                                  elseExpr <- exprParser;
                                   return elseExpr }
   case maybeElse of
     Nothing -> return $ IfThen ifExpr thenExpr
     Just elseExpr -> return $ If { ifExpr=ifExpr, thenExpr=thenExpr, elseExpr=elseExpr }
 
-parseWhile :: Parser Expr
-parseWhile = do
+whileParser :: Parser Expr
+whileParser = do
   reserved "while"
-  test <- parseExpr
+  test <- exprParser
   reserved "do"
-  body <- parseExpr
+  body <- exprParser
   return $ While test body
          
-parseFor :: Parser Expr
-parseFor = do
+forParser :: Parser Expr
+forParser = do
   reserved "for"
   ident <- identifier
   reservedOp ":="
-  idExpr <- parseExpr
+  idExpr <- exprParser
   reserved "to"
-  toExpr <- parseExpr
+  toExpr <- exprParser
   reserved "do"
-  doExpr <- parseExpr
+  doExpr <- exprParser
   return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toExpr, doExpr=doExpr }
 
-parseLet :: Parser Expr
-parseLet = do
+letParser :: Parser Expr
+letParser = do
   reserved "let"
-  decls <- parseDecl `sepBy` whiteSpace
+  decls <- declParser `sepBy` whiteSpace
   reserved "in"
-  body <- semiSep parseExpr
+  body <- semiSep exprParser
   reserved "end"
   return $ Let decls body
 
@@ -337,24 +337,24 @@ operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
             , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
             , [Infix  (reservedOp "-"   >> return (InfixOp Sub )) AssocLeft]
             ]
-parseExpr :: Parser Expr
-parseExpr = buildExpressionParser operators parseGenExpr
+exprParser :: Parser Expr
+exprParser = buildExpressionParser operators genExprParser
 
-parseGenExpr :: Parser Expr
-parseGenExpr = parseIdAndExpr 
+genExprParser :: Parser Expr
+genExprParser = idAndExprParser 
             -- Parses LValues and Funcalls and New Array
             <|> do { (reserved "nil"); return Nil }
             <|> do { val <- natural; return $ IntConst val }
             <|> do { val <- stringLiteral; return $ StringLit val }
-            <|> parseSeqExpr
-            <|> parseNeg
-            <|> parseIf
-            <|> parseWhile
-            <|> parseFor
-            <|> parseLet
+            <|> seqExprParser
+            <|> negParser
+            <|> ifParser
+            <|> whileParser
+            <|> forParser
+            <|> letParser
 
 readExpr :: String -> String
 readExpr input = 
-    case parse parseExpr lang input of
+    case parse exprParser lang input of
       Left err -> show err
       Right val -> show val
