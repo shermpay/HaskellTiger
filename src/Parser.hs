@@ -50,9 +50,9 @@ lang = "tiger"
 type Id = String
 type Comment = String
     
-data Decl = VarDecl {varName :: Id
-                     , varType :: Maybe Type
-                     , varExpr :: Expr}
+data Decl = VarDecl { varName :: Id
+                    , varType :: Maybe Type
+                    , varExpr :: Expr}
           | FunctionDecl FunctionType Expr
           | TypeDecl Type
           deriving Show
@@ -173,7 +173,7 @@ readFunctionDecl input =
          -> epsilon
 -}
 parseLValue :: Parser Expr
-parseLValue = (try parseArraySub <|> parseVar) `chainl1` parseFieldDeref
+parseLValue = (try parseArraySub <|> parseIdExpr) `chainl1` parseFieldDeref
 
 parseFieldDeref :: Parser (Expr -> Expr -> Expr)
 parseFieldDeref = do
@@ -182,13 +182,13 @@ parseFieldDeref = do
 
 parseArraySub :: Parser Expr
 parseArraySub = do
-  var <- parseVar
+  var <- parseIdExpr
   expr <- brackets parseExpr
   notFollowedBy $ reserved "of"
   return $ ArraySub var expr
          
-parseVar :: Parser Expr
-parseVar = liftM Var identifier
+parseIdExpr :: Parser Expr
+parseIdExpr = liftM IdExpr identifier
 
 readLValue :: String -> String
 readLValue input =
@@ -213,7 +213,7 @@ data Op = Add
         | Or
         deriving Show
 
-data Expr = Var Id
+data Expr = IdExpr Id
           | FieldDeref Expr Expr -- (Record, Field)
           | ArraySub Expr Expr
           | Nil
@@ -235,23 +235,11 @@ data Expr = Var Id
                    
 type FieldInit = (Id, Expr)
 
-parseIdExpr :: Parser Expr
-parseIdExpr = 
-     (try parseArraySub <|> (try parseCall) <|> (try parseNewArr) <|> parseVar) 
+parseIdAndExpr :: Parser Expr
+parseIdAndExpr = 
+     (try parseArraySub <|> (try parseCall) <|> (try parseNewArr) <|> parseIdExpr) 
      `chainl1` parseFieldDeref
 
--- parseVarOrSubOrCall :: Parser Expr
--- parseVarOrSubOrCall = do
---   var <- parseVar
---   sub <- optionMaybe $ parseArraySub var
---   case sub of
---     Just e -> return e
---     Nothing -> do 
---              call <- optionMaybe $ parseCall var
---              case call of
---                Just e -> return e
---                Nothing -> return var
-                   
 parseSeqExpr :: Parser Expr
 parseSeqExpr = do { exprs <- parens $ semiSep parseExpr; return $ SeqExpr exprs }
 
@@ -260,7 +248,7 @@ parseNeg = do { reservedOp "-"; expr <- parseExpr ; return $ Neg expr }
 
 parseCall :: Parser Expr
 parseCall = do
-  funcName <- parseVar
+  funcName <- parseIdExpr
   args <- parens $ commaSep parseExpr
   return $ Call funcName args
 
@@ -281,7 +269,7 @@ parseExpr :: Parser Expr
 parseExpr = buildExpressionParser operators parseGenExpr
 
 parseGenExpr :: Parser Expr
-parseGenExpr = parseIdExpr 
+parseGenExpr = parseIdAndExpr 
             -- Parses LValues and Funcalls and New Array
             <|> do { (reserved "nil"); return Nil }
             <|> do { val <- natural; return $ IntConst val }
