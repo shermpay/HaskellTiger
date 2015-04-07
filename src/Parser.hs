@@ -54,7 +54,7 @@ data Decl = VarDecl { varName :: Id
                     , varType :: Maybe Type
                     , varExpr :: Expr}
           | FunctionDecl FunctionType Expr
-          | TypeDecl Type
+          | TypeDecl Type Type
           deriving Show
 -----------------------
 -- Type Declarations --
@@ -95,13 +95,13 @@ parseTypeVal = parseTypeArray
     <|> parseTypeId
     <|> parseTypeRecord
 
-parseTypeDecl :: Parser FieldType 
+parseTypeDecl :: Parser Decl 
 parseTypeDecl = do
   reserved "type"
-  ident <- identifier 
+  typeId <- parseTypeId
   reservedOp "="
   typeVal <- parseTypeVal
-  return $ (ident, typeVal)
+  return $ TypeDecl typeId typeVal
 
 readTypeDecl :: String -> String
 readTypeDecl input =
@@ -157,6 +157,11 @@ readFunctionDecl input =
     case parse parseFunctionDecl lang input of
       Left err -> show err
       Right val -> show val
+
+parseDecl :: Parser Decl
+parseDecl = parseTypeDecl
+            <|> parseVarDecl
+            <|> parseFunctionDecl
                    
 --------------
 -- L-Values --
@@ -318,6 +323,15 @@ parseFor = do
   doExpr <- parseExpr
   return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toExpr, doExpr=doExpr }
 
+parseLet :: Parser Expr
+parseLet = do
+  reserved "let"
+  decls <- parseDecl `sepBy` whiteSpace
+  reserved "in"
+  body <- semiSep parseExpr
+  reserved "end"
+  return $ Let decls body
+
 operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
             , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
             , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
@@ -337,6 +351,7 @@ parseGenExpr = parseIdAndExpr
             <|> parseIf
             <|> parseWhile
             <|> parseFor
+            <|> parseLet
 
 readExpr :: String -> String
 readExpr input = 
