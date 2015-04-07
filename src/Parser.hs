@@ -236,9 +236,13 @@ data Expr = IdExpr Id
 type FieldInit = (Id, Expr)
 
 parseIdAndExpr :: Parser Expr
-parseIdAndExpr = 
-     (try parseArraySub <|> (try parseCall) <|> (try parseNewArr) <|> parseIdExpr) 
-     `chainl1` parseFieldDeref
+parseIdAndExpr = (try parseArraySub 
+                 <|> (try parseCall) 
+                 <|> (try parseNewArr) 
+                 <|> (try parseNewRec)
+                 <|> (try parseAssign)
+                 <|> parseIdExpr) 
+                 `chainl1` parseFieldDeref
 
 parseSeqExpr :: Parser Expr
 parseSeqExpr = do { exprs <- parens $ semiSep parseExpr; return $ SeqExpr exprs }
@@ -259,6 +263,26 @@ parseNewArr = do
   reserved "of"
   initVal <- parseExpr
   return $ NewArr {arrayType=arrType, arraySize=size, arrayInit=initVal}
+
+parseFieldInit :: Parser (Id, Expr)
+parseFieldInit = do
+    ident <- identifier
+    reservedOp "="
+    expr <- parseExpr
+    return (ident, expr)
+        
+parseNewRec :: Parser Expr
+parseNewRec = do
+  recType <- parseTypeId
+  fieldInits <- braces $ commaSep  parseFieldInit
+  return $ NewRec recType fieldInits
+
+parseAssign :: Parser Expr
+parseAssign = do
+  var <- parseIdExpr
+  reservedOp ":="
+  expr <- parseExpr
+  return $ Assign var expr
 
 operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
             , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
