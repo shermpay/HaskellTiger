@@ -298,6 +298,26 @@ parseIf = do
     Nothing -> return $ IfThen ifExpr thenExpr
     Just elseExpr -> return $ If { ifExpr=ifExpr, thenExpr=thenExpr, elseExpr=elseExpr }
 
+parseWhile :: Parser Expr
+parseWhile = do
+  reserved "while"
+  test <- parseExpr
+  reserved "do"
+  body <- parseExpr
+  return $ While test body
+         
+parseFor :: Parser Expr
+parseFor = do
+  reserved "for"
+  ident <- identifier
+  reservedOp ":="
+  idExpr <- parseExpr
+  reserved "to"
+  toExpr <- parseExpr
+  reserved "do"
+  doExpr <- parseExpr
+  return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toExpr, doExpr=doExpr }
+
 operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
             , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
             , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
@@ -315,6 +335,8 @@ parseGenExpr = parseIdAndExpr
             <|> parseSeqExpr
             <|> parseNeg
             <|> parseIf
+            <|> parseWhile
+            <|> parseFor
 
 readExpr :: String -> String
 readExpr input = 
