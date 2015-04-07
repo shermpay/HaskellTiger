@@ -227,6 +227,7 @@ data Expr = IdExpr Id
           | NewRec Type [FieldInit]
           | Assign Expr Expr
           | If { ifExpr :: Expr, thenExpr :: Expr,  elseExpr :: Expr }
+          | IfThen Expr Expr
           | While Expr Expr
           | For { forVarName :: Id, forVarExpr :: Expr, toExpr :: Expr, doExpr :: Expr }
           | Break
@@ -284,6 +285,19 @@ parseAssign = do
   expr <- parseExpr
   return $ Assign var expr
 
+parseIf :: Parser Expr
+parseIf = do
+  reserved "if"
+  ifExpr <- parseExpr
+  reserved "then"
+  thenExpr <- parseExpr
+  maybeElse <- optionMaybe $ do { reserved "else";
+                                  elseExpr <- parseExpr;
+                                  return elseExpr }
+  case maybeElse of
+    Nothing -> return $ IfThen ifExpr thenExpr
+    Just elseExpr -> return $ If { ifExpr=ifExpr, thenExpr=thenExpr, elseExpr=elseExpr }
+
 operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
             , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
             , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
@@ -300,6 +314,7 @@ parseGenExpr = parseIdAndExpr
             <|> do { val <- stringLiteral; return $ StringLit val }
             <|> parseSeqExpr
             <|> parseNeg
+            <|> parseIf
 
 readExpr :: String -> String
 readExpr input = 
