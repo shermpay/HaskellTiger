@@ -358,3 +358,11 @@ readExpr input =
     case parse exprParser lang input of
       Left err -> show err
       Right val -> show val
+
+type Prog = Expr
+
+parseProg :: String -> String -> Prog
+parseProg progName input =
+    case parse exprParser progName input of
+      Left err -> error $ show err
+      Right prog -> prog
