@@ -214,10 +214,10 @@ data Op = Add
         | Div
         | Eq
         | NE
-        | LT
-        | LTE
-        | GT
-        | GTE
+        | Less
+        | LessEq
+        | Greater
+        | GreaterEq
         | And
         | Or
         deriving Show
@@ -340,6 +340,15 @@ operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
             , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
             , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
             , [Infix  (reservedOp "-"   >> return (InfixOp Sub )) AssocLeft]
+
+            , [Infix  (reservedOp "&"   >> return (InfixOp And )) AssocLeft]
+            , [Infix  (reservedOp "|"   >> return (InfixOp Or )) AssocLeft]
+            , [Infix  (reservedOp "="   >> return (InfixOp Eq )) AssocLeft]
+            , [Infix  (reservedOp "<>"   >> return (InfixOp NE )) AssocLeft]
+            , [Infix  (reservedOp ">"   >> return (InfixOp Greater )) AssocLeft]
+            , [Infix  (reservedOp "<"   >> return (InfixOp Less)) AssocLeft]
+            , [Infix  (reservedOp ">="   >> return (InfixOp GreaterEq )) AssocLeft]
+            , [Infix  (reservedOp "<="   >> return (InfixOp LessEq )) AssocLeft]
             ]
 exprParser :: Parser Expr
 exprParser = buildExpressionParser operators genExprParser
