@@ -1,3 +1,7 @@
+module Tiger.Parser ( parseProg
+                    , Prog 
+                    , Expr) where
+
 import Control.Monad
 import Control.Applicative ((<$>))
 import Text.Parsec
@@ -351,6 +355,7 @@ genExprParser = idAndExprParser
             <|> ifParser
             <|> whileParser
             <|> forParser
+            <|> do { (reserved "Break"); return Break }
             <|> letParser
 
 readExpr :: String -> String
@@ -363,6 +368,6 @@ type Prog = Expr
 
 parseProg :: String -> String -> Prog
 parseProg progName input =
-    case parse exprParser progName input of
+    case parse (whiteSpace >> exprParser) progName input of
       Left err -> error $ show err
       Right prog -> prog
