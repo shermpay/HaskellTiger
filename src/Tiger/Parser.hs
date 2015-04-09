@@ -2,14 +2,17 @@ module Tiger.Parser ( parseProg
                     , Prog 
                     , Expr) where
 
+import qualified Data.List as List
 import Control.Monad
 import Control.Applicative ((<$>))
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr
+import Text.Parsec.Pos
 -- import Text.ParserCombinators.Parsec
 import qualified Text.Parsec.Token as Tok
 
+{- Token Definitions -}
 def = Tok.LanguageDef { Tok.commentStart = "/*"
                       , Tok.commentEnd = "*/"
                       , Tok.commentLine = ""
@@ -28,6 +31,7 @@ def = Tok.LanguageDef { Tok.commentStart = "/*"
                                               , "&", "|"]
                       , Tok.caseSensitive = True}
            
+{- Creates a Lexer -}
 lexer@Tok.TokenParser { Tok.identifier = identifier
                       , Tok.reserved = reserved
                       , Tok.operator = operator
@@ -54,12 +58,16 @@ lang = "tiger"
 type Id = String
 type Comment = String
     
+------------------
+-- Declarations --
+------------------
 data Decl = VarDecl { varName :: Id
                     , varType :: Maybe Type
                     , varExpr :: Expr}
           | FunctionDecl FunctionType Expr
           | TypeDecl Type Type
           deriving Show
+
 -----------------------
 -- Type Declarations --
 -----------------------
@@ -225,23 +233,52 @@ data Op = Add
 data Expr = IdExpr Id
           | FieldDeref Expr Expr -- (Record, Field)
           | ArraySub Expr Expr
-          | Nil
-          | IntConst Integer
-          | StringLit String
+          | Nil SourcePos 
+          | IntConst SourcePos Integer
+          | StringLit SourcePos String
           | SeqExpr [Expr]
           | Neg Expr
-          | Call Expr [Expr]
+          | Call SourcePos Expr [Expr]
           | InfixOp Op Expr Expr
-          | NewArr {arrayType :: Type,  arraySize :: Expr, arrayInit ::  Expr}
-          | NewRec Type [FieldInit]
-          | Assign Expr Expr
-          | If { ifExpr :: Expr, thenExpr :: Expr,  elseExpr :: Expr }
-          | IfThen Expr Expr
-          | While Expr Expr
-          | For { forVarName :: Id, forVarExpr :: Expr, toExpr :: Expr, doExpr :: Expr }
-          | Break
-          | Let [Decl] [Expr]
+          | NewArr {arrayType :: Type,  arraySize :: Expr, arrayInit ::  Expr
+                   , arrayPos :: SourcePos }
+          | NewRec SourcePos Type [FieldInit]
+          | Assign SourcePos Expr Expr
+          | If { ifTest :: Expr, thenExpr :: Expr,  elseExpr :: Maybe Expr
+               , ifPos :: SourcePos }
+          | While{ whileTest :: Expr, whileBody :: Expr, whilePos :: SourcePos }
+          | For { forVarName :: Id, forVarExpr :: Expr, toExpr :: Expr, doExpr :: Expr 
+                , forPos :: SourcePos }
+          | Break SourcePos
+          | Let { letDecls :: [Decl], letBody ::  [Expr], letPos :: SourcePos }
           deriving Show
+                
+showListData :: [Expr] -> String
+showListData lst =
+    '[' : (concat $ List.intersperse ", " $ map showData lst) ++ "]"
+
+wrapIn :: String -> String -> String -> String
+wrapIn l r str = l ++ str ++ r
+wrapParens :: String -> String
+wrapParens = wrapIn "(" ")"
+
+spacedConcat :: [String] -> String
+spacedConcat = concat . List.intersperse " "
+
+nodeStr :: [String] -> String
+nodeStr = wrapParens . spacedConcat
+
+instance ASTNode Expr where
+    showData (Nil _) = wrapParens "Nil"
+    showData (IntConst _ x) = nodeStr ["IntConst", (show x)]
+    showData (StringLit _ x) = nodeStr ["StringLit", (show x)]
+    showData (SeqExpr e) = nodeStr ["SeqExpr", (showListData e)]
+    showData (Call _ f a) = nodeStr ["Call", (show f), (showListData a)]
+    showData (InfixOp op e1 e2) = nodeStr
+                                  ["InfixOp", (show op), (showData e1), (showData e2)]
+    showData (NewArr {arrayType=t, arraySize=s, arrayInit=i}) =
+        nodeStr ["NewArr", (show t), (showData s), (showData i)]
+    showData e = wrapParens $ show e
                    
 type FieldInit = (Id, Expr)
 
@@ -262,17 +299,19 @@ negParser = do { reservedOp "-"; expr <- exprParser ; return $ Neg expr }
 
 callParser :: Parser Expr
 callParser = do
+  pos <- getPosition
   funcName <- idExprParser
   args <- parens $ commaSep exprParser
-  return $ Call funcName args
+  return $ Call pos funcName args
 
 newArrParser :: Parser Expr
 newArrParser = do
+  pos <- getPosition
   arrType <- typeIdParser
   size <- brackets exprParser
   reserved "of"
   initVal <- exprParser
-  return $ NewArr {arrayType=arrType, arraySize=size, arrayInit=initVal}
+  return $ NewArr {arrayType=arrType, arraySize=size, arrayInit=initVal, arrayPos=pos}
 
 fieldInitParser :: Parser (Id, Expr)
 fieldInitParser = do
@@ -283,40 +322,43 @@ fieldInitParser = do
         
 newRecParser :: Parser Expr
 newRecParser = do
+  pos <- getPosition
   recType <- typeIdParser
   fieldInits <- braces $ commaSep  fieldInitParser
-  return $ NewRec recType fieldInits
+  return $ NewRec pos recType fieldInits
 
 assignParser :: Parser Expr
 assignParser = do
+  pos <- getPosition
   var <- idExprParser
   reservedOp ":="
   expr <- exprParser
-  return $ Assign var expr
+  return $ Assign pos var expr
 
 ifParser :: Parser Expr
 ifParser = do
+  pos <- getPosition
   reserved "if"
   ifExpr <- exprParser
   reserved "then"
   thenExpr <- exprParser
-  maybeElse <- optionMaybe $ do { reserved "else";
+  elseExpr <- optionMaybe $ do { reserved "else";
                                   elseExpr <- exprParser;
                                   return elseExpr }
-  case maybeElse of
-    Nothing -> return $ IfThen ifExpr thenExpr
-    Just elseExpr -> return $ If { ifExpr=ifExpr, thenExpr=thenExpr, elseExpr=elseExpr }
+  return $ If { ifTest=ifExpr, thenExpr=thenExpr, elseExpr=elseExpr, ifPos=pos }
 
 whileParser :: Parser Expr
 whileParser = do
+  pos <- getPosition
   reserved "while"
   test <- exprParser
   reserved "do"
   body <- exprParser
-  return $ While test body
+  return $ While {whileTest=test, whileBody=body, whilePos=pos}
          
 forParser :: Parser Expr
 forParser = do
+  pos <- getPosition
   reserved "for"
   ident <- identifier
   reservedOp ":="
@@ -325,30 +367,32 @@ forParser = do
   toExpr <- exprParser
   reserved "do"
   doExpr <- exprParser
-  return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toExpr, doExpr=doExpr }
+  return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toExpr, doExpr=doExpr 
+               , forPos=pos }
 
 letParser :: Parser Expr
 letParser = do
+  pos <- getPosition
   reserved "let"
   decls <- declParser `sepBy` whiteSpace
   reserved "in"
   body <- semiSep exprParser
   reserved "end"
-  return $ Let decls body
+  return $ Let { letDecls=decls, letBody=body, letPos=pos}
 
-operators = [ [Infix  (reservedOp "*"   >> return (InfixOp Div )) AssocLeft]
-            , [Infix  (reservedOp "/"   >> return (InfixOp Mult)) AssocLeft]
-            , [Infix  (reservedOp "+"   >> return (InfixOp Add )) AssocLeft]
-            , [Infix  (reservedOp "-"   >> return (InfixOp Sub )) AssocLeft]
+operators = [ [Infix (reservedOp "*"  >> return (InfixOp Div )) AssocLeft]
+            , [Infix (reservedOp "/"  >> return (InfixOp Mult)) AssocLeft]
+            , [Infix (reservedOp "+"  >> return (InfixOp Add )) AssocLeft]
+            , [Infix (reservedOp "-"  >> return (InfixOp Sub )) AssocLeft]
 
-            , [Infix  (reservedOp "&"   >> return (InfixOp And )) AssocLeft]
-            , [Infix  (reservedOp "|"   >> return (InfixOp Or )) AssocLeft]
-            , [Infix  (reservedOp "="   >> return (InfixOp Eq )) AssocLeft]
-            , [Infix  (reservedOp "<>"   >> return (InfixOp NE )) AssocLeft]
-            , [Infix  (reservedOp ">"   >> return (InfixOp Greater )) AssocLeft]
-            , [Infix  (reservedOp "<"   >> return (InfixOp Less)) AssocLeft]
-            , [Infix  (reservedOp ">="   >> return (InfixOp GreaterEq )) AssocLeft]
-            , [Infix  (reservedOp "<="   >> return (InfixOp LessEq )) AssocLeft]
+            , [Infix (reservedOp "&"  >> return (InfixOp And )) AssocLeft]
+            , [Infix (reservedOp "|"  >> return (InfixOp Or )) AssocLeft]
+            , [Infix (reservedOp "="  >> return (InfixOp Eq )) AssocLeft]
+            , [Infix (reservedOp "<>" >> return (InfixOp NE )) AssocLeft]
+            , [Infix (reservedOp ">"  >> return (InfixOp Greater )) AssocLeft]
+            , [Infix (reservedOp "<"  >> return (InfixOp Less)) AssocLeft]
+            , [Infix (reservedOp ">=" >> return (InfixOp GreaterEq )) AssocLeft]
+            , [Infix (reservedOp "<=" >> return (InfixOp LessEq )) AssocLeft]
             ]
 exprParser :: Parser Expr
 exprParser = buildExpressionParser operators genExprParser
@@ -356,15 +400,15 @@ exprParser = buildExpressionParser operators genExprParser
 genExprParser :: Parser Expr
 genExprParser = idAndExprParser 
             -- Parses LValues and Funcalls and New Array
-            <|> do { (reserved "nil"); return Nil }
-            <|> do { val <- natural; return $ IntConst val }
-            <|> do { val <- stringLiteral; return $ StringLit val }
+            <|> do { pos <- getPosition; (reserved "nil"); return $ Nil pos }
+            <|> do { pos <- getPosition; val <- natural; return $ IntConst pos val }
+            <|> do { pos <- getPosition; val <- stringLiteral; return $ StringLit pos val }
             <|> seqExprParser
             <|> negParser
             <|> ifParser
             <|> whileParser
             <|> forParser
-            <|> do { (reserved "Break"); return Break }
+            <|> do { pos <- getPosition; (reserved "Break"); return $ Break pos }
             <|> letParser
 
 readExpr :: String -> String
@@ -373,7 +417,14 @@ readExpr input =
       Left err -> show err
       Right val -> show val
 
+--------------
+-- Exported --
+--------------
 type Prog = Expr
+
+class (Show a) => ASTNode a where
+    showData :: a -> String
+    -- sourcePos :: a -> SourcePos
 
 parseProg :: String -> String -> Prog
 parseProg progName input =
