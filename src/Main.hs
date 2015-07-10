@@ -40,6 +40,7 @@ main :: IO ()
 main = do
   args <- Env.getArgs
   case getOpt Permute options args of
-    (optArgs, _, []) -> handleOpt $ head optArgs
+    (optArgs, _, []) -> case optArgs of 
+                          arg:_ -> handleOpt $ arg
+                          [] -> usage
     (_, _, err) -> do { putStr $ head err; usage }
-                   
