@@ -37,7 +37,8 @@ for f in $TIGER_FLAGS; do
                 print '----------------------------------------------------------------'
                 # Run executable with flag on file
                 $EXECUTABLE $flag $file | tee -a $logfile
-                ret=$?
+                # PIPESTATUS captures the exit codes through the pipe
+                ret=${PIPESTATUS[0]}
                 print '----------------------------------------------------------------'
                 # Output Pass/Fail
                 if [[ $ret -eq 0 ]] ; then
