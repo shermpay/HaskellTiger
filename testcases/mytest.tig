@@ -1,0 +1,5 @@
+let
+    var arr := int [ 10 ] of 0
+in
+    arr[0] := 0; arr
+end
