@@ -214,11 +214,11 @@ operatorMap = Map.fromList [ (Add, "+")
 
 
 idAndExprParser :: Parser Expr
-idAndExprParser = (try arraySubParser 
+idAndExprParser = (try assignParser
                  <|> (try callParser) 
                  <|> (try newArrParser) 
                  <|> (try newRecParser)
-                 <|> (try assignParser)
+                 <|> (try arraySubParser)
                  <|> idExprParser) 
                  `chainl1` fieldDerefParser
 
@@ -268,7 +268,7 @@ newRecParser = do
 assignParser :: Parser Expr
 assignParser = do
   pos <- getPosition
-  var <- idExprParser
+  var <- lValueParser
   reservedOp ":="
   expr <- exprParser
   return $ Assign pos var expr
@@ -277,13 +277,13 @@ ifParser :: Parser Expr
 ifParser = do
   pos <- getPosition
   reserved "if"
-  ifExpr <- exprParser
+  ifT <- exprParser
   reserved "then"
-  thenExpr <- exprParser
-  elseExpr <- optionMaybe $ do { reserved "else";
-                                 elseExpr <- exprParser;
-                                 return elseExpr }
-  return $ If { ifTest=ifExpr, thenExpr=thenExpr, elseExpr=elseExpr, ifPos=pos }
+  thenE <- exprParser
+  elseE <- optionMaybe $ do { reserved "else";
+                                 elseE <- exprParser;
+                                 return elseE }
+  return $ If { ifTest=ifT, thenExpr=thenE, elseExpr=elseE, ifPos=pos }
 
 whileParser :: Parser Expr
 whileParser = do
@@ -302,10 +302,10 @@ forParser = do
   reservedOp ":="
   idExpr <- exprParser
   reserved "to"
-  toExpr <- exprParser
+  toE <- exprParser
   reserved "do"
-  doExpr <- exprParser
-  return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toExpr, doExpr=doExpr 
+  doE <- exprParser
+  return $ For { forVarName=ident, forVarExpr=idExpr, toExpr=toE, doExpr=doE 
                , forPos=pos }
 
 letParser :: Parser Expr
@@ -343,18 +343,20 @@ exprParser :: Parser Expr
 exprParser = buildExpressionParser operators genExprParser
 
 genExprParser :: Parser Expr
-genExprParser = idAndExprParser 
-            -- Parses LValues and Funcalls and New Array
-            <|> do { pos <- getPosition; (reserved "nil"); return $ Nil pos }
-            <|> do { pos <- getPosition; val <- natural; return $ IntConst pos val }
-            <|> do { pos <- getPosition; val <- stringLiteral; return $ StringLit pos val }
-            <|> seqExprParser
-            <|> negParser
-            <|> ifParser
-            <|> whileParser
-            <|> forParser
-            <|> do { pos <- getPosition; (reserved "Break"); return $ Break pos }
-            <|> letParser
+genExprParser = 
+    -- Parses LValues, Funcalls, New Array, Assignment.
+    idAndExprParser 
+    <|> do { pos <- getPosition; (reserved "nil"); return $ Nil pos }
+    <|> do { pos <- getPosition; val <- natural; return $ IntConst pos val }
+    <|> do { pos <- getPosition; val <- stringLiteral; return $ StringLit pos val }
+    <|> seqExprParser
+    <|> negParser
+    <|> callParser
+    <|> ifParser
+    <|> whileParser
+    <|> forParser
+    <|> do { pos <- getPosition; (reserved "Break"); return $ Break pos }
+    <|> letParser
 
 readExpr :: String -> String
 readExpr input = 
