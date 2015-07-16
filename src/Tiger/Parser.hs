@@ -2,10 +2,10 @@ module Tiger.Parser ( parseProg ) where
   
 import qualified Data.Map as Map
 import Data.Functor.Identity (Identity)
-import Control.Monad
-import Text.Parsec
-import Text.Parsec.String
-import Text.Parsec.Expr
+import Control.Monad (liftM)
+import Text.Parsec (letter, alphaNum, char, oneOf, parse, getPosition, optionMaybe, sepBy, try, (<|>))
+import Text.Parsec.String (Parser)
+import Text.Parsec.Expr (Operator, Operator(Infix), Assoc(AssocLeft), buildExpressionParser)
 -- import Text.ParserCombinators.Parsec
 import qualified Text.Parsec.Token as Tok
     

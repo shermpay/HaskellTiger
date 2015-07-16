@@ -1,9 +1,7 @@
 module Tiger.AST where
 
-
 import Data.List as List
-import Text.Parsec.Pos
-    
+import Text.Parsec.Pos (SourcePos)
 
 type Id = String
 
