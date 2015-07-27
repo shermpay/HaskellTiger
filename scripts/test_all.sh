@@ -3,7 +3,7 @@
 PROJ_DIR=$HOME/Dropbox/Projects/HaskellTiger
 EXECUTABLE=$PROJ_DIR/.cabal-sandbox/bin/HaskellTiger
 LOG_DIR=$PROJ_DIR/.cabal-sandbox/logs
-TIGER_FLAGS=( '-p' '--parse' '-h' '--help' )
+TIGER_FLAGS=( '-p' '--parse' '-h' '--help' '-a' '--ast' )
 flag=$1
 
 num_passed=0
@@ -14,6 +14,7 @@ usage() {
     echo -e 'Possible Tiger Flags:'
     echo -e '  '${TIGER_FLAGS[@]}
 }
+echo 'FLAGS '${TIGER_FLAGS[@]}
 if [[ $flag == '' ]] ; then
     usage
     exit 1
@@ -23,7 +24,8 @@ print() {
     echo -e $1 | tee -a $logfile
 }
 
-for f in $TIGER_FLAGS; do
+# cabal install
+for f in ${TIGER_FLAGS[@]}; do
     if [[ $flag == $f ]] ; then
         print 'Testing '$flag' flag'
         # Create a logging file
