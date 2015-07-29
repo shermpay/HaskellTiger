@@ -12,6 +12,7 @@ import qualified Tiger.Parser as Parser
     
 -- | Command line flags
 data Flag = Parse IO.FilePath
+          | PrintAST IO.FilePath
           | Version
           | Help
           deriving Show
@@ -20,6 +21,7 @@ data Flag = Parse IO.FilePath
 options :: [OptDescr Flag]
 options =
     [ Option ['p'] ["parse"] (ReqArg Parse "FILE") "parse FILE"
+    , Option ['a'] ["ast"]   (ReqArg PrintAST "FILE") "output the AST of FILE"
     , Option ['h'] ["help"]  (NoArg Help) "Prints this usage string" ]
     
 -- | Parses a file given a String representing the filename
@@ -32,7 +34,11 @@ parseFile fileName = do
 handleOpt :: Flag -> IO ()
 handleOpt (Parse f) = do
   prog <- parseFile f
-  putStrLn $ show prog
+  putStrLn $ AST.showData prog
+  return ()
+handleOpt (PrintAST f) = do
+  prog <- parseFile f
+  putStrLn $ AST.showAST prog
   return ()
 handleOpt Help = usage
          

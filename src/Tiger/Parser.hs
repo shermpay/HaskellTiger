@@ -6,7 +6,7 @@ import Control.Monad (liftM)
 import Text.Parsec (letter, alphaNum, char, oneOf, parse, getPosition, optionMaybe, sepBy, try, (<|>))
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr (Operator, Operator(Infix), Assoc(AssocLeft), buildExpressionParser)
--- import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec (chainl1, notFollowedBy)
 import qualified Text.Parsec.Token as Tok
     
 import Tiger.AST
@@ -367,10 +367,6 @@ readExpr input =
 --------------
 -- Exported --
 --------------
-class (Show a) => ASTNode a where
-    showData :: a -> String
-    -- sourcePos :: a -> SourcePos
-
 parseProg :: String -> String -> Prog
 parseProg progName input =
     case parse (whiteSpace >> exprParser) progName input of
