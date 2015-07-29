@@ -200,7 +200,7 @@ readLValue input =
 operatorMap :: Map.Map Op String
 operatorMap = Map.fromList [ (Add, "+")
                            , (Sub, "-")
-                           , (Mult, "*")
+                           , (Mul, "*")
                            , (Div, "/")
                            , (Eq, "=")
                            , (NE, "<>")
@@ -325,7 +325,7 @@ makeOpParser op = do
   return $ InfixOp pos op
 
 operators :: [[Operator String () Data.Functor.Identity.Identity Expr]]
-operators = [ [Infix (makeOpParser Mult) AssocLeft]
+operators = [ [Infix (makeOpParser Mul) AssocLeft]
             , [Infix (makeOpParser Div) AssocLeft]
             , [Infix (makeOpParser Add) AssocLeft]
             , [Infix (makeOpParser Sub) AssocLeft]

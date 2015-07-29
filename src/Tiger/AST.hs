@@ -1,10 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Tiger.AST
-    ( Op
-    , Type
-    , FunctionType
-    , Decl
-    , Expr
+    ( Id
+    , Prog
+    , Op (..)
+    , Type (..)
+    , FunctionType (..)
+    , FieldType
+    , RecordType
+    , Decl (..)
+    , Expr (..)
     , showData
     , showAST ) where
 
@@ -18,7 +22,7 @@ type Id = String
 ---------------
 data Op = Add
         | Sub
-        | Mult
+        | Mul
         | Div
         | Eq
         | NE
@@ -30,7 +34,19 @@ data Op = Add
         | Or
         deriving (Show, Ord, Eq)
 
-
+showOp :: Op -> String
+showOp Add       = "+"
+showOp Sub       = "-"
+showOp Mul       = "*"
+showOp Div       = "/"
+showOp Eq        = "="
+showOp NE        = "<>"
+showOp Less      = "<"
+showOp LessEq    = "<="
+showOp Greater   = ">"
+showOp GreaterEq = ">="
+showOp And       = "&"
+showOp Or        = "|"
 -----------------------
 -- Type Declarations --
 -----------------------
@@ -160,16 +176,29 @@ tinc = inc . inc . inc
 showExprs :: Int -> [Expr] -> String
 showExprs indent lst = concatMap ((++ "\n") . showExpr indent) lst
 
-showExprs :: Int -> Expr -> String
+showExpr :: Int -> Expr -> String
+showExpr indent (FieldDeref _ obj field) = 
+    makeIndent indent "FIELD_DEREF\n" ++
+    showExpr (inc indent) obj ++ "\n" ++
+    makeIndent (inc indent) "DOT\n" ++
+    showExpr (inc indent) field
+showExpr indent (ArraySub _ arr sub) = 
+    makeIndent indent "ARR_SUB\n" ++
+    showExpr (inc indent) arr ++ "\n" ++
+    makeIndent (inc indent) "SUB\n" ++
+    showExpr (inc indent) sub
 showExpr indent (SeqExpr _ e) = makeIndent indent
                                 "SEQEXPR\n" ++ showExprs (inc indent) e
 showExpr indent (Call _ f a) = makeIndent indent
                                "CALL\n" ++ showExpr (inc indent) f ++ "\n" ++
                                makeIndent (inc indent)
                                "ARGS\n" ++ showExprs (dinc indent) a
-showExpr indent (InfixOp _ op e1 e2) = makeIndent indent (show op) ++
-                                  ('\n':showExpr (inc indent) e1) ++
-                                  ('\n':showExpr (inc indent) e2)
+showExpr indent (InfixOp _ op e1 e2) = 
+    showExpr indent e1 ++ "\n" ++ makeIndent indent (showOp op) ++ "\n" ++ 
+    showExpr indent e2
+    -- makeIndent indent (show op) ++
+    --                               ('\n':showExpr (inc indent) e1) ++
+    --                               ('\n':showExpr (inc indent) e2)
 showExpr indent (If test te ee _) = makeIndent indent ("IF\n" ++
                                     showExpr (inc indent) test) ++ "\n" ++
 
@@ -187,10 +216,35 @@ showExpr indent (Let decls body _)  = makeIndent indent
                          where showDecls = concatMap
                                            ((++ "\n") . (showDecl (inc indent)))
                                            decls
+showExpr indent NewArr { arrayType=ty, arraySize=size, arrayInit=expr } =
+    makeIndent indent "ARRAY\n" ++ 
+    showType (inc indent) ty ++ "\n" ++
+    makeIndent (inc indent) "SIZE\n" ++ 
+    showExpr (dinc indent) size ++ "\n" ++
+    makeIndent (inc indent)  "ARRAYINIT\n" ++ 
+    showExpr (dinc indent) expr
 showExpr indent (NewRec _ ty fieldInits) =
     showType (inc indent) ty ++ " :\n" ++ 
      (concatMap (\(i, e) -> makeIndent (inc . inc $ indent)
                             i ++ " = " ++ showData e ++ "\n") fieldInits)
+showExpr indent (Assign _ lexpr rexpr) = 
+    makeIndent indent "ASSIGN\n" ++
+    showExpr (inc indent) lexpr ++ " := \n" ++
+    showExpr (inc indent) rexpr ++ "\n"
+showExpr indent While { whileTest=test, whileBody=body } =
+    makeIndent indent "WHILE\n" ++
+    makeIndent (inc indent) "TEST\n" ++
+    showExpr (dinc indent) test ++ "\n" ++
+    makeIndent (inc indent) "WHILE_BODY\n" ++
+    showExpr (dinc indent) body
+showExpr indent For { forVarName=var, forVarExpr=expr, toExpr=to, doExpr=body } =
+    makeIndent indent "FOR\n" ++
+    makeIndent (inc indent) "FOR_VAR " ++ var ++ " :=\n" ++
+    showExpr (dinc indent) expr ++ "\n" ++
+    makeIndent (inc indent) "TO\n" ++
+    showExpr (dinc indent) to ++ "\n" ++
+    makeIndent (inc indent) "FOR_BODY\n" ++
+    showExpr (dinc indent) body
 showExpr indent e = makeIndent indent (showData e) 
                     
 showType :: Int -> Type -> String
@@ -202,8 +256,8 @@ showDecl :: Int -> Decl -> String
 showDecl indent (VarDecl i ty e) = makeIndent indent
                                    "VAR\n" ++
                                    makeIndent (inc indent)
-                                              i ++ maybeTypeStr ++
-                                   " :=\n" ++ showExpr (inc indent) e
+                                              i ++ maybeTypeStr ++ " :=\n" ++
+                                   (showExpr (inc indent) e)
                                    where maybeTypeStr = 
                                              case ty of
                                                Just t -> " : "
@@ -211,20 +265,23 @@ showDecl indent (VarDecl i ty e) = makeIndent indent
                                                Nothing -> ""
 showDecl indent (FunctionDecl funtype e) = makeIndent indent
                                            "FUNCTION_DECL\n" ++
-                                           showFuncType (inc indent) funtype ++
-                                           " =\n" ++
-                                                  showExpr (tinc indent) e
+                                           showFuncType (inc indent) funtype ++ "\n" ++
+                                           makeIndent (inc indent)
+                                           "FUNC_BODY\n" ++ showExpr (tinc indent) e
 showDecl indent (TypeDecl ty1 ty2) = makeIndent indent 
-                                     "TYPE\n" ++ showType (inc indent) ty1 ++
-                                     " =\n" ++ showType (inc indent) ty2
+                                     "TYPE\n" ++ showType (inc indent) ty1 ++ " :=\n" ++
+                                     showType (dinc indent) ty2
 
 showFuncType :: Int -> FunctionType -> String
-showFuncType indent (FuncType funcId rectype rettype)
-    = makeIndent indent
+showFuncType indent (FuncType funcId rectype rettype) = 
+    makeIndent indent
       "FUNCTION " ++ funcId ++ "\n" ++
       makeIndent (inc indent) "PARAMS\n" ++ showRecType (inc indent) rectype ++
                      makeIndent (inc indent)
-                                    "RET\n" ++ showType (inc indent) rettype
+                                    "RET\n" ++ showType (dinc indent) rettype
+showFuncType indent (ProcType procId rectype) =
+    makeIndent indent "PROC " ++ procId ++ "\n" ++
+    makeIndent (inc indent) "PARAMS\n" ++ showRecType (inc indent) rectype
 
 showRecType :: Int -> RecordType -> String
 showRecType indent rectype =
