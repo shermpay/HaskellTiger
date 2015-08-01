@@ -1,0 +1,7 @@
+* List of Known Bugs sorted by Priority
+** P1
+   - [ ] +Parser parses `Nil` as `IdExpr`+
+** P1
+   - [ ] +0/1 expressions in parentheses should not be sequences+
+** P2
+Add testcase which uses break
