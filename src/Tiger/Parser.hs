@@ -90,7 +90,7 @@ typeValParser = typeArrayParser
 typeDeclParser :: Parser Decl 
 typeDeclParser = do
   reserved "type"
-  typeId <- typeIdParser
+  typeId <- identifier
   reservedOp "="
   typeVal <- typeValParser
   return $ TypeDecl typeId typeVal
@@ -371,4 +371,4 @@ parseProg :: String -> String -> Prog
 parseProg progName input =
     case parse (whiteSpace >> exprParser) progName input of
       Left err -> error $ show err
-      Right prog -> prog
+      Right prog -> Prog prog

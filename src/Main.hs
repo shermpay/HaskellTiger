@@ -9,10 +9,12 @@ import System.Exit
 
 import qualified Tiger.AST as AST
 import qualified Tiger.Parser as Parser
+import qualified Tiger.Semantics as Semantics
     
 -- | Command line flags
 data Flag = Parse IO.FilePath
           | PrintAST IO.FilePath
+          | SymbolTables IO.FilePath
           | Version
           | Help
           deriving Show
@@ -22,6 +24,8 @@ options :: [OptDescr Flag]
 options =
     [ Option ['p'] ["parse"] (ReqArg Parse "FILE") "parse FILE"
     , Option ['a'] ["ast"]   (ReqArg PrintAST "FILE") "output the AST of FILE"
+    , Option ['s'] ["symbol_tables"] (ReqArg SymbolTables "FILE")
+                 "Build symbol tables of FILE and output"
     , Option ['h'] ["help"]  (NoArg Help) "Prints this usage string" ]
     
 -- | Parses a file given a String representing the filename
@@ -34,12 +38,16 @@ parseFile fileName = do
 handleOpt :: Flag -> IO ()
 handleOpt (Parse f) = do
   prog <- parseFile f
-  putStrLn $ AST.showData prog
+  putStrLn $ AST.showData (let AST.Prog p = prog in p) 
   return ()
 handleOpt (PrintAST f) = do
   prog <- parseFile f
-  putStrLn $ AST.showAST prog
+  putStrLn $ AST.showAST (let AST.Prog p = prog in p)
   return ()
+handleOpt (SymbolTables f) = do
+  let symTables = Semantics.newSymTables
+  prog <- parseFile f
+  putStrLn $ show $ Semantics.buildSymTables prog symTables
 handleOpt Help = usage
          
 -- | Print usage string

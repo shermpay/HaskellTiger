@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Tiger.AST
     ( Id
-    , Prog
+    , Prog (Prog)
     , Op (..)
     , Type (..)
     , FunctionType (..)
@@ -71,7 +71,7 @@ data Decl = VarDecl { varName :: Id
                     , varType :: Maybe Type
                     , varExpr :: Expr}
           | FunctionDecl FunctionType Expr
-          | TypeDecl Type Type
+          | TypeDecl Id Type
           deriving Show
 
 
@@ -103,7 +103,7 @@ data Expr = IdExpr SourcePos Id
           | Let { letDecls :: [Decl], letBody ::  [Expr], letPos :: SourcePos }
           deriving Show
 
-type Prog = Expr
+newtype Prog = Prog Expr
 
 ----------------
 -- Output AST --
@@ -269,7 +269,7 @@ showDecl indent (FunctionDecl funtype e) = makeIndent indent
                                            makeIndent (inc indent)
                                            "FUNC_BODY\n" ++ showExpr (tinc indent) e
 showDecl indent (TypeDecl ty1 ty2) = makeIndent indent 
-                                     "TYPE\n" ++ showType (inc indent) ty1 ++ " :=\n" ++
+                                     "TYPE\n" ++ makeIndent (inc indent) ty1 ++ " :=\n" ++
                                      showType (dinc indent) ty2
 
 showFuncType :: Int -> FunctionType -> String

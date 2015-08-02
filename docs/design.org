@@ -1,0 +1,21 @@
+#+TITLE: Design Doc
+* Semantics
+** Types
+   
+#+BEGIN_SRC haskell -n
+data Type = TInt
+          | TString
+          | TRecord [(AST.Id, Type)]
+          | TArray [Type]
+          | TNil
+          | TUnit
+          | TName [(AST.Id, Type)]
+#+END_SRC
+
+** Symbol Tables
+*** Symbol
+    newtype Symbol = Symbol String
+*** Variable/Function Environment
+Map: Symbol -> Type
+*** Type Environment
+Map: Symbol -> Type
