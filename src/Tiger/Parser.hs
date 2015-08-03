@@ -1,3 +1,15 @@
+{-|
+Module      : Tiger.Parser
+Description : This library provides parser combinators to parse Tiger code into ASTs
+Copyright   : (c) Sherman Pay, 2015
+License     : 
+Maintainer  : shermanpay1991@gmail.com
+Stability   : experimental
+Portability : POSIX
+
+Here is a longer description of this module, containing some
+commentary with @some markup@.
+-}
 module Tiger.Parser ( parseProg ) where
   
 import qualified Data.Map as Map

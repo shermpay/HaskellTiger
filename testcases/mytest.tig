@@ -1,4 +1,6 @@
 let
     var arr := nil
+    type myint = int
+    var x : myint := 1
 in
 end

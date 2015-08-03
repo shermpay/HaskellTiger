@@ -3,7 +3,7 @@
 PROJ_DIR=$HOME/Dropbox/Projects/HaskellTiger
 EXECUTABLE=$PROJ_DIR/.cabal-sandbox/bin/HaskellTiger
 LOG_DIR=$PROJ_DIR/.cabal-sandbox/logs
-TIGER_FLAGS=( '-p' '--parse' '-h' '--help' '-a' '--ast' )
+TIGER_FLAGS=( '-p' '--parse' '-h' '--help' '-a' '--ast' '-s' '--symbol_tables')
 flag=$1
 
 num_passed=0
