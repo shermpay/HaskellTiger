@@ -24,8 +24,8 @@ options :: [OptDescr Flag]
 options =
     [ Option ['p'] ["parse"] (ReqArg Parse "FILE") "parse FILE"
     , Option ['a'] ["ast"]   (ReqArg PrintAST "FILE") "output the AST of FILE"
-    , Option ['s'] ["symbol_tables"] (ReqArg SymbolTables "FILE")
-                 "Build symbol tables of FILE and output"
+    , Option ['s'] ["semantic"] (ReqArg SymbolTables "FILE")
+                 "semantic analysis on FILE and output symbol tables"
     , Option ['h'] ["help"]  (NoArg Help) "Prints this usage string" ]
     
 -- | Parses a file given a String representing the filename
@@ -47,7 +47,7 @@ handleOpt (PrintAST f) = do
 handleOpt (SymbolTables f) = do
   let symTables = Semantics.newSymTables
   prog <- parseFile f
-  putStrLn $ show $ Semantics.buildSymTables prog symTables
+  putStrLn $ show $ Semantics.analyze prog symTables
 handleOpt Help = usage
          
 -- | Print usage string
