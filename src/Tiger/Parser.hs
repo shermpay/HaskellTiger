@@ -250,7 +250,7 @@ negParser = do
 callParser :: Parser Expr
 callParser = do
   pos <- getPosition
-  funcName <- idExprParser
+  funcName <- identifier
   args <- parens $ commaSep exprParser
   return $ Call pos funcName args
 

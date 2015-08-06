@@ -100,7 +100,7 @@ data Expr = IdExpr SourcePos Id
           | StringLit SourcePos String
           | SeqExpr SourcePos [Expr]
           | Neg SourcePos Expr
-          | Call SourcePos Expr [Expr]
+          | Call SourcePos Id [Expr]
           | InfixOp SourcePos Op Expr Expr
           | NewArr {arrayType :: Type,  arraySize :: Expr, arrayInit ::  Expr
                    , arrayPos :: SourcePos }
@@ -202,7 +202,7 @@ showExpr indent (ArraySub _ arr sub) =
 showExpr indent (SeqExpr _ e) = makeIndent indent
                                 "SEQEXPR\n" ++ showExprs (inc indent) e
 showExpr indent (Call _ f a) = makeIndent indent
-                               "CALL\n" ++ showExpr (inc indent) f ++ "\n" ++
+                               "CALL\n" ++ makeIndent (inc indent) f ++ "\n" ++
                                makeIndent (inc indent)
                                "ARGS\n" ++ showExprs (dinc indent) a
 showExpr indent (InfixOp _ op e1 e2) = 
