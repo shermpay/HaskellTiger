@@ -19,3 +19,22 @@ data Type = TInt
 Map: Symbol -> Type
 *** Type Environment
 Map: Symbol -> Type
+** Testcases
+   - [ ] test5: Valid recursive record
+   - [ ] test16: mutually recursive types that do not pass through record
+   - [ ] test23: hmmm...
+   - [ ] test24: hmmm...
+   - [ ] test25: hmmm...
+   - [ ] test31: type constaint and init value defer
+   - [ ] test32: type constaint and array init expr defer
+   - [ ] test34: unknown rec type
+   - [ ] test37: redeclaration
+   - [ ] test38: redeclaring types are illegal
+   - [ ] test39: redeclaring functions are illegal
+
+** Error Messages
+   Needs work.
+   Possible Idea:
+   typeCheck :: * -> Either ErrorBuffer Type 
+   Every call to typeCheck has to check if it encountered ErrorBuffer.
+   Whenever types are invalid, build up buffer.
