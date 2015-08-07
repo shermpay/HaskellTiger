@@ -101,11 +101,12 @@ typeValParser = typeArrayParser
 
 typeDeclParser :: Parser Decl 
 typeDeclParser = do
+  pos <- getPosition
   reserved "type"
   typeId <- identifier
   reservedOp "="
   typeVal <- typeValParser
-  return $ TypeDecl typeId typeVal
+  return $ TypeDecl pos typeId typeVal
 
 readTypeDecl :: String -> String
 readTypeDecl input =
@@ -124,12 +125,13 @@ typeAnnParser = do
 
 varDeclParser :: Parser Decl
 varDeclParser = do
+  pos <- getPosition
   reserved "var"
   ident <- identifier
   varT <- optionMaybe $ try typeAnnParser
   reservedOp ":="
   expr <- exprParser
-  return VarDecl {varName=ident, varType=varT, varExpr=expr}
+  return VarDecl {varName=ident, varType=varT, varExpr=expr, varPos=pos}
 
 readVarDecl :: String -> String
 readVarDecl input =
@@ -142,15 +144,16 @@ readVarDecl input =
 -------------------------------------
 functionDeclParser :: Parser Decl
 functionDeclParser = do
+  pos <- getPosition
   reserved "function"
   ident <- identifier
   paramDecl <- parens typeFieldsParser
   retType <- optionMaybe $ try typeAnnParser
   reservedOp "="
   body <- exprParser
-  return $ FunctionDecl (case retType of
-                           Nothing -> ProcType ident paramDecl
-                           Just ret -> FuncType ident paramDecl ret) body
+  return $ FunctionDecl pos (case retType of
+                               Nothing -> ProcType ident paramDecl
+                               Just ret -> FuncType ident paramDecl ret) body
 
 readFunctionDecl :: String -> String
 readFunctionDecl input =

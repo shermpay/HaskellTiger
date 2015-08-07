@@ -81,9 +81,10 @@ data FunctionType = FuncType Id RecordType Type
 ------------------
 data Decl = VarDecl { varName :: Id
                     , varType :: Maybe Type
-                    , varExpr :: Expr}
-          | FunctionDecl FunctionType Expr
-          | TypeDecl Id Type
+                    , varExpr :: Expr
+                    , varPos  :: SourcePos }
+          | FunctionDecl SourcePos FunctionType Expr
+          | TypeDecl SourcePos Id Type
           deriving Show
 
 
@@ -265,7 +266,7 @@ showType indent (RecordType ty) = showRecType indent ty
 showType indent (ArrayType ty) = showType indent ty 
                                  
 showDecl :: Int -> Decl -> String
-showDecl indent (VarDecl i ty e) = makeIndent indent
+showDecl indent (VarDecl i ty e _) = makeIndent indent
                                    "VAR\n" ++
                                    makeIndent (inc indent)
                                               i ++ maybeTypeStr ++ " :=\n" ++
@@ -275,12 +276,12 @@ showDecl indent (VarDecl i ty e) = makeIndent indent
                                                Just t -> " : "
                                                          ++ showData t
                                                Nothing -> ""
-showDecl indent (FunctionDecl funtype e) = makeIndent indent
+showDecl indent (FunctionDecl _ funtype e) = makeIndent indent
                                            "FUNCTION_DECL\n" ++
                                            showFuncType (inc indent) funtype ++ "\n" ++
                                            makeIndent (inc indent)
                                            "FUNC_BODY\n" ++ showExpr (tinc indent) e
-showDecl indent (TypeDecl ty1 ty2) = makeIndent indent 
+showDecl indent (TypeDecl _ ty1 ty2) = makeIndent indent 
                                      "TYPE\n" ++ makeIndent (inc indent) ty1 ++ " :=\n" ++
                                      showType (dinc indent) ty2
 
