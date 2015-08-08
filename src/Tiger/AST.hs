@@ -230,7 +230,7 @@ showExpr indent (Let decls body _)  = makeIndent indent
                                            ((++ "\n") . (showDecl (inc indent)))
                                            decls
 showExpr indent NewArr { arrayType=ty, arraySize=size, arrayInit=expr } =
-    makeIndent indent "ARRAY\n" ++ 
+    makeIndent indent "NEWARRAY\n" ++ 
     showType (inc indent) ty ++ "\n" ++
     makeIndent (inc indent) "SIZE\n" ++ 
     showExpr (dinc indent) size ++ "\n" ++

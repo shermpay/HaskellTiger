@@ -22,15 +22,19 @@ Map: Symbol -> Type
 ** Testcases
    - [ ] test5: Valid recursive record
    - [ ] test16: mutually recursive types that do not pass through record
-   - [ ] test23: hmmm...
-   - [ ] test24: hmmm...
-   - [ ] test25: hmmm...
-   - [ ] test31: type constaint and init value defer
-   - [ ] test32: type constaint and array init expr defer
-   - [ ] test34: unknown rec type
-   - [ ] test37: redeclaration
-   - [ ] test38: redeclaring types are illegal
-   - [ ] test39: redeclaring functions are illegal
+   - [X] test23: hmmm...
+   - [X] test24: hmmm...
+   - [X] test25: hmmm...
+   - [X] test31: type constaint and init value defer
+   - [X] test32: type constaint and array init expr defer
+   - [ ] test32: Error not being evaluated. Therefore error not thrown.
+   - [X] test33: unknown rec type
+   - [ ] test33: Error not being evaluated. Therefore error not thrown.
+   - [X] test37: redeclaration
+   - [X] test38: redeclaring types are illegal
+   - [X] test39: redeclaring functions are illegal
+     Also sym tables from arg list missing in function body
+   - [ ] test48: I do not comprehend
 
 ** Error Messages
    Needs work.
