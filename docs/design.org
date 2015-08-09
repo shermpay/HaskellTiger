@@ -1,4 +1,7 @@
 #+TITLE: Design Doc
+* Parser
+  Precedence: '.' and '[]' subscript.
+  '.' stronger
 * Semantics
 ** Types
    
@@ -34,7 +37,14 @@ Map: Symbol -> Type
    - [X] test38: redeclaring types are illegal
    - [X] test39: redeclaring functions are illegal
      Also sym tables from arg list missing in function body
-   - [ ] test48: I do not comprehend
+   - [ ] test42: Type equality
+   - [ ] test44: Nil and record compatibility
+   - [ ] test45: Nil and record compatibility
+   - [ ] test46: Nil and record compatibility
+   - [ ] test47: Mutual recursion
+   - [ ] test48: Mutual recursion
+   - [ ] queen: Type equality
+   - [ ] merge: Type equality
 
 ** Error Messages
    Needs work.

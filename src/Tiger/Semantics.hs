@@ -34,6 +34,13 @@ data Type = TInt
           | TFunc [Type] (Maybe Type)
           | TName Sym (Maybe Type)
             deriving (Show, Eq)
+
+resolveType :: SymTable -> Type -> Type
+resolveType tab (TName s ty)
+    = case ty of
+        Just syn -> resolveType tab syn
+        Nothing -> error ("Cannot resolve type " ++ (show s))
+resolveType _ primTy = primTy
             
 -- | Map of primitive types
 -- Corresponding data type should be declared in Type
@@ -45,9 +52,9 @@ primitivesMap = Map.fromList [
 -- | Takes an AST.Type and converts it to a Type
 -- Returns TName Sym Nothing if cannot find corresponding type
 typeFromAST ::  SymTable -> AST.Type -> Type
-typeFromAST (SymTable tab) (AST.Type ident) =  case Map.lookup (Sym ident) tab of
-                                                 Just x -> x
-                                                 Nothing -> TName (Sym ident) Nothing
+typeFromAST (SymTable tab) (AST.Type ident) = case Map.lookup (Sym ident) tab of
+                                                Just x -> x
+                                                Nothing -> TName (Sym ident) Nothing
 typeFromAST tab (AST.RecordType recty) = TRecord $ 
                                      map (\(ident, ty) -> (Sym ident, typeFromAST tab ty))
                                          recty
@@ -129,12 +136,12 @@ addDecl tab@(SymTables { valEnv=ve
             
 addDecl tab@(SymTables { valEnv=t
                        , typEnv=te })
-            (AST.TypeDecl pos ident tyid)
+            (AST.TypeDecl pos ident tyNode)
     = SymTables { valEnv=t
                 , typEnv=
                     case existing of
                       Just _ -> newErr pos ("Redeclaring type: " ++ ident)
-                      Nothing -> addString ident (typeFromAST te tyid) te }
+                      Nothing -> addString ident (typeFromAST te tyNode) te }
       where existing = lookupString ident te
 addDecl tab@(SymTables { valEnv=ve
                        , typEnv=t })
@@ -143,7 +150,7 @@ addDecl tab@(SymTables { valEnv=ve
     = case funcTy of
            AST.FuncType ident paramTy retNode ->
                SymTables { valEnv=addFunc ident
-                                   (if retTy == (typeCheck env body)
+                                   (if retTy == typeCheck env body
                                     then (TFunc (createFormals vEnv paramTy) (Just retTy))
                                     else newErr pos "Function body return type mismatch")
                          , typEnv=t }
@@ -152,7 +159,7 @@ addDecl tab@(SymTables { valEnv=ve
                          retTy = typeFromAST t retNode
            AST.ProcType ident paramTy ->
                SymTables { valEnv=addFunc ident
-                                   (if TUnit == (typeCheck env body)
+                                   (if TUnit == typeCheck env body
                                     then (TFunc (createFormals vEnv paramTy) Nothing)
                                     else newErr pos "Procedure body cannot have value")
                          , typEnv=t }
@@ -182,27 +189,29 @@ analyze :: AST.Prog -> SymTables -> Type
 analyze (AST.Prog prog) tabs = typeCheck tabs prog 
 
 newErr :: SourcePos -> String -> a
-newErr p s = error $ (show p) ++ ": " ++ s
+newErr p s = error $ (show p) ++ ": " ++ s      
 
 typeCheckList :: SymTables -> [AST.Expr] -> Type
 typeCheckList tab es = if List.null es
                        then TUnit
-                       else last $ map (typeCheck tab) es
+                       else resolveType (typEnv tab) $ last $ map (typeCheck tab) es
 
 typeCheck :: SymTables -> AST.Expr -> Type
-typeCheck tab (AST.IdExpr _ idt) = getString idt $ valEnv tab
+typeCheck SymTables  { valEnv=vt
+                     , typEnv=tt } (AST.IdExpr _ idt)
+    = resolveType tt $ getString idt vt
 typeCheck tab (AST.FieldDeref pos re (AST.IdExpr _ field)) =
     case typeCheck tab re of
       -- TODO: Assuming same order now
       TRecord ty -> case List.lookup (Sym field) ty of
-                      Just x -> x
+                      Just x -> resolveType (typEnv tab) x
                       Nothing -> newErr pos "record does not have field"
       _ -> newErr pos "Deref requires record type"
                                                         
-typeCheck tab (AST.ArraySub pos arr e)
+typeCheck tab@(SymTables{typEnv=t}) (AST.ArraySub pos arr e)
     = case typeCheck tab arr of
         TArray ty -> if typeCheck tab e == TInt
-                     then ty
+                     then resolveType t ty
                      else newErr pos "Array subscript not int"
         _ -> newErr pos "Subscript requires array type"
 typeCheck _ (AST.Nil _) = TNil
@@ -212,9 +221,10 @@ typeCheck tab (AST.SeqExpr _ es) = typeCheckList tab es
 typeCheck tab (AST.Neg pos e) = case (typeCheck tab e) of
                                   TInt -> TInt
                                   _ -> newErr pos "Cannot negate non-number"
-typeCheck tab@(SymTables { valEnv=vTab }) (AST.Call pos f args) =
+typeCheck tab@(SymTables { valEnv=vTab
+                         , typEnv=tTab }) (AST.Call pos f args) =
     if paramTy == argTy
-    then retTy
+    then resolveType tTab retTy
     else newErr pos ("argument types do not match" ++ "\nformals: " ++ show paramTy ++ 
              "\nargs:    " ++ show argTy)
     where argTy = map (typeCheck tab) args
@@ -233,33 +243,40 @@ typeCheck tab AST.NewArr { AST.arrayType=(AST.Type idt)
                          , AST.arrayInit=arrInit
                          , AST.arrayPos=pos }
     = case (typeCheck tab arrSize) of
-        TInt -> if  arrTy == initTy
+        TInt -> if arrTy == initTy
                 then TArray initTy
-                else newErr pos "Array initialization expression type mismatch"
+                else newErr pos ("Array initialization expression type mismatch" ++
+                                 "\nexpected: " ++ show arrTy ++
+                                 "\nactual:   " ++ show initTy)
             where initTy = typeCheck tab arrInit
-                  arrTy = getString idt (typEnv tab)
+                  (TArray arrTy) = getString idt (typEnv tab)
         _ -> newErr pos "Array size has to be integer"
-typeCheck tab (AST.NewRec pos (AST.Type idt) fields)
+typeCheck tab@(SymTables { valEnv=_
+                         , typEnv=tTab })
+              (AST.NewRec pos (AST.Type idt) fields)
     -- TODO: Currently assumes same ordering
     = if expTy == actTy
-      then actTy
+      then (resolveType tTab actTy)
       else newErr pos ("Record initialization type mismatch" ++
                        "\nexpected: " ++ (show expTy) ++
                        "\nactual:   " ++ (show actTy))
           where expTy = getString idt (typEnv tab) 
                 actTy = TRecord $ map (\(s, expr) -> (Sym s, typeCheck tab expr)) fields
-typeCheck tab (AST.Assign pos le re) = if typeCheck tab le == typeCheck tab re
-                                       then TUnit
-                                       else newErr pos "Assignment type mismatch"
-typeCheck tab AST.If { AST.ifTest=t
-                     , AST.thenExpr=th
-                     , AST.elseExpr=el
-                     , AST.ifPos=pos}
+typeCheck tab@(SymTables { typEnv=tTab })
+               (AST.Assign pos le re) = if typeCheck tab le == typeCheck tab re
+                                        then TUnit
+                                        else newErr pos "Assignment type mismatch"
+typeCheck tab@(SymTables { valEnv=_
+                         , typEnv=tTab })
+              (AST.If { AST.ifTest=t
+                      , AST.thenExpr=th
+                      , AST.elseExpr=el
+                      , AST.ifPos=pos})
     = case typeCheck tab t of
         TInt -> case el of
                   Just e ->
-                      if elTy == (typeCheck tab th)
-                      then elTy
+                      if elTy == typeCheck tab th
+                      then resolveType tTab elTy
                       else newErr pos "then else branch types mismatch"
                       where elTy = (typeCheck tab e)
                   Nothing -> case typeCheck tab th of
