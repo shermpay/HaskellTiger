@@ -209,7 +209,7 @@ fieldDerefParser :: Parser (Expr -> Expr)
 fieldDerefParser = do
   pos <- getPosition
   dot
-  expr <- exprParser
+  expr <- idExprParser
   return $ postfixToExprFn $ Deref pos expr
 
 subscriptParser :: Parser (Expr -> Expr)
