@@ -17,8 +17,10 @@ import Data.Functor.Identity (Identity)
 import Control.Monad (liftM)
 import Text.Parsec (letter, alphaNum, char, oneOf, parse, getPosition, optionMaybe, sepBy, try, (<|>))
 import Text.Parsec.String (Parser)
-import Text.Parsec.Expr (Operator, Operator(Infix), Assoc(AssocLeft), buildExpressionParser)
+import Text.Parsec.Expr (Operator, Operator(Infix), Operator(Postfix), Assoc(AssocLeft)
+                        , buildExpressionParser)
 import Text.ParserCombinators.Parsec (chainl1, notFollowedBy)
+import Text.Parsec.Pos (SourcePos)
 import qualified Text.Parsec.Token as Tok
     
 import Tiger.AST
@@ -180,15 +182,32 @@ declParser = typeDeclParser
          -> [ exp ] deref
          -> epsilon
 -}
-lValueParser :: Parser Expr
-lValueParser = (try arraySubParser <|> idExprParser) `chainl1` fieldDerefParser
+data PostfixExpr = Deref SourcePos Expr
+                 | Subscript SourcePos Expr
 
-fieldDerefParser :: Parser (Expr -> Expr -> Expr)
+postfixToExprFn :: PostfixExpr -> (Expr -> Expr)
+postfixToExprFn (Deref pos expr) =  \var -> FieldDeref pos var expr
+postfixToExprFn (Subscript pos expr) =  \var -> ArraySub pos var expr
+
+lValueTable = [ [Postfix fieldDerefParser]
+              , [Postfix subscriptParser] ]
+lValueParser :: Parser Expr
+lValueParser = buildExpressionParser lValueTable idExprParser
+
+fieldDerefParser :: Parser (Expr -> Expr)
 fieldDerefParser = do
   pos <- getPosition
   dot
-  return $ FieldDeref pos
+  expr <- exprParser
+  return $ postfixToExprFn $ Deref pos expr
 
+subscriptParser :: Parser (Expr -> Expr)
+subscriptParser = do
+  pos <- getPosition
+  expr <- brackets exprParser
+  return $ postfixToExprFn $ Subscript pos expr
+
+-- TODO: Remove when stable
 arraySubParser :: Parser Expr
 arraySubParser = do
   var <- idExprParser
@@ -233,9 +252,8 @@ idAndExprParser = (try assignParser
                  <|> (try callParser) 
                  <|> (try newArrParser) 
                  <|> (try newRecParser)
-                 <|> (try arraySubParser)
+                 <|> (try lValueParser)
                  <|> idExprParser) 
-                 `chainl1` fieldDerefParser
 
 seqExprParser :: Parser Expr
 seqExprParser = do
@@ -340,7 +358,9 @@ makeOpParser op = do
   return $ InfixOp pos op
 
 operators :: [[Operator String () Data.Functor.Identity.Identity Expr]]
-operators = [ [Infix (makeOpParser Mul) AssocLeft]
+operators = [ [Postfix fieldDerefParser]
+            , [Postfix subscriptParser] 
+            , [Infix (makeOpParser Mul) AssocLeft]
             , [Infix (makeOpParser Div) AssocLeft]
             , [Infix (makeOpParser Add) AssocLeft]
             , [Infix (makeOpParser Sub) AssocLeft]

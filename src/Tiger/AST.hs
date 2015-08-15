@@ -21,6 +21,7 @@ module Tiger.AST
     , RecordType
     , Decl (..)
     , Expr (..)
+    , SourcePos
     , showData
     , showAST ) where
 
