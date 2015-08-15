@@ -15,7 +15,8 @@ module Tiger.Parser ( parseProg ) where
 import qualified Data.Map as Map
 import Data.Functor.Identity (Identity)
 import Control.Monad (liftM)
-import Text.Parsec (letter, alphaNum, char, oneOf, parse, getPosition, optionMaybe, sepBy, try, (<|>))
+import Text.Parsec (letter, alphaNum, char, oneOf, parse, getPosition, optionMaybe
+                   , sepBy, try, many, (<|>))
 import Text.Parsec.String (Parser)
 import Text.Parsec.Expr (Operator, Operator(Infix), Operator(Postfix), Assoc(AssocLeft)
                         , buildExpressionParser)
@@ -182,6 +183,15 @@ declParser = typeDeclParser
          -> [ exp ] deref
          -> epsilon
 -}
+-- | This combinator does ab* in a leftassociative way.
+-- Applicable when you have a cfg rule with left recursion
+-- which you might rewrite into EBNF X -> YZ*.
+lfact :: Parser a -> Parser (a -> a) -> Parser a
+lfact p q = do{ a <- p
+              ; fs <- many q
+              ; return (foldl  (\x f -> f x) a fs)
+              }
+
 data PostfixExpr = Deref SourcePos Expr
                  | Subscript SourcePos Expr
 
@@ -189,10 +199,11 @@ postfixToExprFn :: PostfixExpr -> (Expr -> Expr)
 postfixToExprFn (Deref pos expr) =  \var -> FieldDeref pos var expr
 postfixToExprFn (Subscript pos expr) =  \var -> ArraySub pos var expr
 
-lValueTable = [ [Postfix fieldDerefParser]
-              , [Postfix subscriptParser] ]
+-- lValueTable = [[ Postfix subscriptParser
+--                , Postfix fieldDerefParser]]
 lValueParser :: Parser Expr
-lValueParser = buildExpressionParser lValueTable idExprParser
+lValueParser = lfact idExprParser (fieldDerefParser <|> subscriptParser) 
+-- lValueParser = buildExpressionParser lValueTable idExprParser
 
 fieldDerefParser :: Parser (Expr -> Expr)
 fieldDerefParser = do
@@ -358,9 +369,7 @@ makeOpParser op = do
   return $ InfixOp pos op
 
 operators :: [[Operator String () Data.Functor.Identity.Identity Expr]]
-operators = [ [Postfix fieldDerefParser]
-            , [Postfix subscriptParser] 
-            , [Infix (makeOpParser Mul) AssocLeft]
+operators = [ [Infix (makeOpParser Mul) AssocLeft]
             , [Infix (makeOpParser Div) AssocLeft]
             , [Infix (makeOpParser Add) AssocLeft]
             , [Infix (makeOpParser Sub) AssocLeft]

@@ -1,7 +1,8 @@
 #+TITLE: Design Doc
 * Parser
-  Precedence: '.' and '[]' subscript.
-  '.' stronger
+  '.' and '[]' are left to right.
+  Better Error messages?
+  Is it an error for extra semicolon at the end?
 * Semantics
 ** Types
    
@@ -26,6 +27,7 @@ Map: Symbol -> Type
    - [ ] test5: Valid recursive record
    - [ ] test16: mutually recursive types that do not pass through record
    - [X] test23: hmmm...
+     lValue parser should not parse assign
    - [X] test24: hmmm...
    - [X] test25: hmmm...
    - [X] test31: type constaint and init value defer
@@ -45,7 +47,7 @@ Map: Symbol -> Type
    - [ ] test48: Mutual recursion
    - [ ] queen: Type equality
    - [ ] merge: Type equality
-
+     
 ** Error Messages
    Needs work.
    Possible Idea:

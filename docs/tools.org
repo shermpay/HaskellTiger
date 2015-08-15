@@ -1,0 +1,17 @@
+#+TITLE: Tools to Make Life Easier
+* scripts
+  All under the /scripts/ directory
+** test_all.sh
+   Script to run a compiler pass on many files. Requires compilation
+   Pretty prints the output of tests
+*** TODO test_all failure handling
+    Parse header comments for error type(or success).
+    match against stdout.
+    
+    Example:
+    =/* success */=
+    =/* error: TypeError */=
+** try.sh
+   Script to run a single compiler pass on a single file using runhaskell
+** logs.sh
+   Script for manipulating logs
