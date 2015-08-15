@@ -1,0 +1,8 @@
+let
+    type myint = int
+    var x : myint := 0
+    type intarray = array of int
+    var a : intarray := intarray[4] of 0
+in
+    a
+end

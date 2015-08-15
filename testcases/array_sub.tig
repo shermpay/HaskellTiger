@@ -1,0 +1,15 @@
+
+let
+        type intarr = array of int
+	type Vector = {elts : intarr, size : int}
+        type Point = {x : int, y : int}
+        type parr = array of Point
+	var v := Vector{elts=intarr[8] of 0, size=8}
+        var arr := intarr[8] of 0
+        var ps := parr[8] of Point{x=0, y=0}
+in
+	v.elts[0] := 1;
+	v.elts[0];
+        arr[3];
+        ps[0].x
+end
