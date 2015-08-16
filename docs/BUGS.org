@@ -3,7 +3,9 @@
    - [ ] +Parser parses `Nil` as `IdExpr`+
    - [ ] +0/1 expressions in parentheses should not be sequences+
    - [X] TypeDecl Type Type?
-   - [ ] L-Value parsing does not have left to right precedence
-   - [ ] Trys to parse assign as LValue?
+   - [X] L-Value parsing does not have left to right precedence
+     Might be fixed @ [master b879069]. Further investigation required.
+   - [X] Trys to parse assign as LValue?
+     fixed @ [master b879069]
 ** P2
 Add testcase which uses break

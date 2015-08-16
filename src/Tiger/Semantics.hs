@@ -41,6 +41,17 @@ resolveType tab (TName s ty)
         Just syn -> resolveType tab syn
         Nothing -> error ("Cannot resolve type " ++ (show s))
 resolveType _ primTy = primTy
+
+(=::) :: Type -> Type -> Bool
+(=::) TNil (TRecord  _)= True
+(=::) (TRecord _) TNil = True
+(=::) t1 t2 = t1 == t2
+
+tyListEq :: [Type] -> [Type] -> Bool
+tyListEq [] [] = True
+tyListEq (x:xs) (y:ys) = if x =:: y
+                         then tyListEq xs ys
+                         else False
             
 -- | Map of primitive types
 -- Corresponding data type should be declared in Type
@@ -115,7 +126,7 @@ addDecl tab@(SymTables { valEnv=ve
                     , AST.varExpr=expr
                     , AST.varPos=pos })
     = let newValEnv = case existing of
-                        Just ty -> if exTy == ty
+                        Just ty -> if exTy =:: ty
                                    then case mAnnType of
                                           Just annType -> checkAnn annType
                                           Nothing -> Either.Right $ ve
@@ -125,7 +136,7 @@ addDecl tab@(SymTables { valEnv=ve
                                      Nothing -> Either.Right $ addString vName exTy ve
               where exTy = typeCheck tab expr
                     existing = lookupString vName ve
-                    checkAnn annNode = if exTy == vt
+                    checkAnn annNode = if exTy =:: vt
                                        then Either.Right $ addString vName exTy ve
                                        else Either.Left $ "Expr and ann type mismatch"
                                            where vt = (typeFromAST t annNode)
@@ -150,7 +161,7 @@ addDecl tab@(SymTables { valEnv=ve
     = case funcTy of
            AST.FuncType ident paramTy retNode ->
                SymTables { valEnv=addFunc ident
-                                   (if retTy == typeCheck env body
+                                   (if retTy =:: typeCheck env body
                                     then (TFunc (createFormals vEnv paramTy) (Just retTy))
                                     else newErr pos "Function body return type mismatch")
                          , typEnv=t }
@@ -159,7 +170,7 @@ addDecl tab@(SymTables { valEnv=ve
                          retTy = typeFromAST t retNode
            AST.ProcType ident paramTy ->
                SymTables { valEnv=addFunc ident
-                                   (if TUnit == typeCheck env body
+                                   (if TUnit =:: typeCheck env body
                                     then (TFunc (createFormals vEnv paramTy) Nothing)
                                     else newErr pos "Procedure body cannot have value")
                          , typEnv=t }
@@ -210,7 +221,7 @@ typeCheck tab (AST.FieldDeref pos re (AST.IdExpr _ field)) =
                                                         
 typeCheck tab@(SymTables{typEnv=t}) (AST.ArraySub pos arr e)
     = case typeCheck tab arr of
-        TArray ty -> if typeCheck tab e == TInt
+        TArray ty -> if typeCheck tab e =:: TInt
                      then resolveType t ty
                      else newErr pos "Array subscript not int"
         _ -> newErr pos "Subscript requires array type"
@@ -223,7 +234,7 @@ typeCheck tab (AST.Neg pos e) = case (typeCheck tab e) of
                                   _ -> newErr pos "Cannot negate non-number"
 typeCheck tab@(SymTables { valEnv=vTab
                          , typEnv=tTab }) (AST.Call pos f args) =
-    if paramTy == argTy
+    if paramTy `tyListEq` argTy
     then resolveType tTab retTy
     else newErr pos ("argument types do not match" ++ "\nformals: " ++ show paramTy ++ 
              "\nargs:    " ++ show argTy)
@@ -232,18 +243,24 @@ typeCheck tab@(SymTables { valEnv=vTab
           retTy = case ret of
                     Just x -> x
                     Nothing -> TUnit
-typeCheck tab (AST.InfixOp pos _ l r) =
-    case (lty, rty) of
-      (TInt, TInt) -> TInt
-      _ -> newErr pos "Cannot apply binary op to non-number"
+typeCheck tab (AST.InfixOp pos op l r) =
+    case op of
+      AST.Eq -> check lty rty
+      AST.NotEq -> check lty rty
+      _ -> case (lty, rty) of
+             (TInt, TInt) -> TInt
+             _ -> newErr pos "Cannot apply binary op to non-number"
     where lty = typeCheck tab l
           rty = typeCheck tab r
+          check t1 t2 = if lty =:: rty
+                        then TInt
+                        else newErr pos "Cannot compare two different types"
 typeCheck tab AST.NewArr { AST.arrayType=(AST.Type idt)
                          , AST.arraySize=arrSize
                          , AST.arrayInit=arrInit
                          , AST.arrayPos=pos }
     = case (typeCheck tab arrSize) of
-        TInt -> if arrTy == initTy
+        TInt -> if arrTy =:: initTy
                 then TArray initTy
                 else newErr pos ("Array initialization expression type mismatch" ++
                                  "\nexpected: " ++ show arrTy ++
@@ -255,7 +272,7 @@ typeCheck tab@(SymTables { valEnv=_
                          , typEnv=tTab })
               (AST.NewRec pos (AST.Type idt) fields)
     -- TODO: Currently assumes same ordering
-    = if expTy == actTy
+    = if expTy =:: actTy
       then (resolveType tTab actTy)
       else newErr pos ("Record initialization type mismatch" ++
                        "\nexpected: " ++ (show expTy) ++
@@ -263,7 +280,7 @@ typeCheck tab@(SymTables { valEnv=_
           where expTy = getString idt (typEnv tab) 
                 actTy = TRecord $ map (\(s, expr) -> (Sym s, typeCheck tab expr)) fields
 typeCheck tab@(SymTables { typEnv=tTab })
-               (AST.Assign pos le re) = if typeCheck tab le == typeCheck tab re
+               (AST.Assign pos le re) = if typeCheck tab le =:: typeCheck tab re
                                         then TUnit
                                         else newErr pos "Assignment type mismatch"
 typeCheck tab@(SymTables { valEnv=_
@@ -275,7 +292,7 @@ typeCheck tab@(SymTables { valEnv=_
     = case typeCheck tab t of
         TInt -> case el of
                   Just e ->
-                      if elTy == typeCheck tab th
+                      if elTy =:: typeCheck tab th
                       then resolveType tTab elTy
                       else newErr pos "then else branch types mismatch"
                       where elTy = (typeCheck tab e)

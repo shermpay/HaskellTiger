@@ -38,7 +38,7 @@ data Op = Add
         | Mul
         | Div
         | Eq
-        | NE
+        | NotEq
         | Less
         | LessEq
         | Greater
@@ -53,7 +53,7 @@ showOp Sub       = "-"
 showOp Mul       = "*"
 showOp Div       = "/"
 showOp Eq        = "="
-showOp NE        = "<>"
+showOp NotEq        = "<>"
 showOp Less      = "<"
 showOp LessEq    = "<="
 showOp Greater   = ">"

@@ -248,7 +248,7 @@ operatorMap = Map.fromList [ (Add, "+")
                            , (Mul, "*")
                            , (Div, "/")
                            , (Eq, "=")
-                           , (NE, "<>")
+                           , (NotEq, "<>")
                            , (Less, "<")
                            , (LessEq, "<=")
                            , (Greater, ">")
@@ -376,7 +376,7 @@ operators = [ [Infix (makeOpParser Mul) AssocLeft]
             , [Infix (makeOpParser And) AssocLeft]
             , [Infix (makeOpParser Or) AssocLeft]
             , [Infix (makeOpParser Eq) AssocLeft]
-            , [Infix (makeOpParser NE) AssocLeft]
+            , [Infix (makeOpParser NotEq) AssocLeft]
             , [Infix (makeOpParser Greater) AssocLeft]
             , [Infix (makeOpParser Less) AssocLeft]
             , [Infix (makeOpParser GreaterEq) AssocLeft]
