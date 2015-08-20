@@ -21,8 +21,10 @@ if [[ $flag == '' ]] ; then
 fi
 
 print() {
-    echo -e $1 | tee -a $logfile
+    echo -e $@ | tee -a $logfile
 }
+
+tests_failed=''
 
 # cabal install
 for f in ${TIGER_FLAGS[@]}; do
@@ -48,6 +50,7 @@ for f in ${TIGER_FLAGS[@]}; do
                     print '\e[30;42m''PASSED''\e[0m'
                 else
                     print '\e[41m''FAILED''\e[0m'
+                    tests_failed="$tests_failed $file"
                 fi
                 print '================================================================'
             else
@@ -62,6 +65,11 @@ for f in ${TIGER_FLAGS[@]}; do
         print '+ Total:\t'$total
         print '+ Passed:\t'$num_passed
         print '+ Failed:\t'$(( $total - $num_passed ))
+        print 'Following tests failed:'
+        for t in $tests_failed;
+        do
+            echo "    $t"
+        done
 
         exit 0
     fi

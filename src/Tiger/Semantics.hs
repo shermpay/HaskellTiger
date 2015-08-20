@@ -16,6 +16,8 @@ module Tiger.Semantics where
 import qualified Data.Map as Map
 import qualified Data.List as List
 import qualified Data.Either as Either
+import Data.IORef
+import qualified Control.Monad as Monad
 
 import Text.Parsec.Pos (SourcePos, newPos, initialPos)
 
@@ -34,6 +36,7 @@ data Type = TInt
           | TFunc [Type] (Maybe Type)
           | TName Sym (Maybe Type)
             deriving (Show, Eq)
+            -- deriving (Eq)
 
 resolveType :: SymTable -> Type -> Type
 resolveType tab (TName s ty)
@@ -43,8 +46,9 @@ resolveType tab (TName s ty)
 resolveType _ primTy = primTy
 
 (=::) :: Type -> Type -> Bool
-(=::) TNil (TRecord  _)= True
-(=::) (TRecord _) TNil = True
+(=::) TNil (TRecord  _ ) = True
+(=::) (TRecord _ ) TNil = True
+-- (=::) (TRecord _ x) (TRecord _ y) = x == y
 (=::) t1 t2 = t1 == t2
 
 tyListEq :: [Type] -> [Type] -> Bool
@@ -60,15 +64,19 @@ primitivesMap = Map.fromList [
                   (Sym "int", TInt)
                 , (Sym "string", TString)]
 
+-- | Map of builtin functions
+builtinsMap :: Map.Map Sym Type
+builtinsMap = Map.fromList [
+               (Sym "print", TFunc [TString] Nothing)] 
 -- | Takes an AST.Type and converts it to a Type
 -- Returns TName Sym Nothing if cannot find corresponding type
 typeFromAST ::  SymTable -> AST.Type -> Type
 typeFromAST (SymTable tab) (AST.Type ident) = case Map.lookup (Sym ident) tab of
                                                 Just x -> x
                                                 Nothing -> TName (Sym ident) Nothing
-typeFromAST tab (AST.RecordType recty) = TRecord $ 
-                                     map (\(ident, ty) -> (Sym ident, typeFromAST tab ty))
-                                         recty
+typeFromAST tab (AST.RecordType recty) = TRecord  
+                                         (map (\(ident, ty) -> (Sym ident, typeFromAST tab ty))
+                                          recty)
 typeFromAST tab (AST.ArrayType arrty) = TArray $ typeFromAST tab arrty
                                    
 -- | Sym represents a Symbol in the SymTable
@@ -108,6 +116,9 @@ emptySymTable = SymTable $ Map.empty
 initTypeSymTable :: SymTable
 initTypeSymTable = SymTable primitivesMap
 
+initValSymTable :: SymTable
+initValSymTable = SymTable builtinsMap
+
 -- | Merge two SymTables with preference for the first one
 mergeSymTable :: SymTable -> SymTable -> SymTable
 mergeSymTable (SymTable m1) (SymTable m2) = SymTable $ Map.union m1 m2
@@ -138,7 +149,9 @@ addDecl tab@(SymTables { valEnv=ve
                     existing = lookupString vName ve
                     checkAnn annNode = if exTy =:: vt
                                        then Either.Right $ addString vName exTy ve
-                                       else Either.Left $ "Expr and ann type mismatch"
+                                       else Either.Left $ ("Expr and ann type mismatch" ++
+                                                           "\nExpr: " ++ show vt ++
+                                                           "\nAnn: " ++ show exTy)
                                            where vt = (typeFromAST t annNode)
       in
         case newValEnv of
@@ -152,8 +165,21 @@ addDecl tab@(SymTables { valEnv=t
                 , typEnv=
                     case existing of
                       Just _ -> newErr pos ("Redeclaring type: " ++ ident)
-                      Nothing -> addString ident (typeFromAST te tyNode) te }
+                      Nothing -> newTypEnv }
       where existing = lookupString ident te
+            ty = typeFromAST te tyNode
+            tempTypEnv = addString ident (resolveType te $ ty) te
+            compFields (sy, typ)
+                = case typ of
+                    TName s Nothing -> case lookupSym s tempTypEnv of
+                                         -- Just _ -> (sy, TRecur s)
+                                         Nothing -> (sy, typ)
+                    _ -> (sy, typ)
+            compTy = case ty of
+                       TRecord fs -> TRecord $ map compFields fs
+                       _ -> ty
+            newTypEnv = addString ident compTy te
+
 addDecl tab@(SymTables { valEnv=ve
                        , typEnv=t })
             (AST.FunctionDecl pos funcTy body)
@@ -162,26 +188,31 @@ addDecl tab@(SymTables { valEnv=ve
            AST.FuncType ident paramTy retNode ->
                SymTables { valEnv=addFunc ident
                                    (if retTy =:: typeCheck env body
-                                    then (TFunc (createFormals vEnv paramTy) (Just retTy))
+                                    then fTy
                                     else newErr pos "Function body return type mismatch")
                          , typEnv=t }
                    where vEnv = newEnv paramTy
-                         env = SymTables { valEnv=vEnv, typEnv=t }
+                         env = SymTables { valEnv=addString ident fTy vEnv, typEnv=t }
                          retTy = typeFromAST t retNode
+                         fTy = TFunc (createFormals vEnv paramTy) (Just retTy)
            AST.ProcType ident paramTy ->
                SymTables { valEnv=addFunc ident
                                    (if TUnit =:: typeCheck env body
-                                    then (TFunc (createFormals vEnv paramTy) Nothing)
+                                    then fTy
                                     else newErr pos "Procedure body cannot have value")
                          , typEnv=t }
                    where vEnv = newEnv paramTy
-                         env = SymTables { valEnv=vEnv, typEnv=t }
+                         env = SymTables { valEnv=addString ident fTy vEnv, typEnv=t }
+                         fTy = TFunc (createFormals vEnv paramTy) Nothing
       where addIdType env (idt, ty) = case (lookupString idt env) of
                             Just _ -> newErr pos ("Invalid list of formals. " ++ idt)
                             Nothing -> addString idt (typeFromAST t ty) env
             newEnv paramTy = mergeSymTable (List.foldl' addIdType emptySymTable paramTy)
                              ve
-            createFormals env = map (\(f, _) -> getString f env)
+            createFormals env = map
+                                (\(f, _) -> case lookupString f env of
+                                              Just t -> t
+                                              Nothing -> newErr pos "Type does not exist")
             addFunc idt func = case lookupString idt ve of
                                  Just _ -> newErr pos ("Redeclaring function: " ++ idt)
                                  Nothing -> addString idt func ve
@@ -192,7 +223,7 @@ addDecls = List.foldl' addDecl
 
 -- | Create and initialize SymTables
 newSymTables :: SymTables
-newSymTables = SymTables { valEnv=emptySymTable
+newSymTables = SymTables { valEnv=initValSymTable
                          , typEnv=initTypeSymTable }
 
 -- | Analyze and build SymTables given a Prog
@@ -209,8 +240,10 @@ typeCheckList tab es = if List.null es
 
 typeCheck :: SymTables -> AST.Expr -> Type
 typeCheck SymTables  { valEnv=vt
-                     , typEnv=tt } (AST.IdExpr _ idt)
-    = resolveType tt $ getString idt vt
+                     , typEnv=tt } (AST.IdExpr pos idt)
+    = resolveType tt $ case lookupString idt vt of
+                         Just t -> t
+                         Nothing -> newErr pos ("Cannot resolve type for " ++ show idt)
 typeCheck tab (AST.FieldDeref pos re (AST.IdExpr _ field)) =
     case typeCheck tab re of
       -- TODO: Assuming same order now
@@ -239,7 +272,10 @@ typeCheck tab@(SymTables { valEnv=vTab
     else newErr pos ("argument types do not match" ++ "\nformals: " ++ show paramTy ++ 
              "\nargs:    " ++ show argTy)
     where argTy = map (typeCheck tab) args
-          TFunc paramTy ret = getString f vTab
+          TFunc paramTy ret = case lookupString f vTab of
+                                Just t -> t
+                                Nothing ->
+                                    newErr pos ("Cannot resolve func type " ++ show f)
           retTy = case ret of
                     Just x -> x
                     Nothing -> TUnit
@@ -276,8 +312,11 @@ typeCheck tab@(SymTables { valEnv=_
       then (resolveType tTab actTy)
       else newErr pos ("Record initialization type mismatch" ++
                        "\nexpected: " ++ (show expTy) ++
-                       "\nactual:   " ++ (show actTy))
-          where expTy = getString idt (typEnv tab) 
+                       "\nactual:   " ++ (show actTy) ++
+                       "\nSymbols: " ++ show tab)
+          where expTy = case getString idt (typEnv tab) of
+                          -- (TRecord ty) -> TRecord $ map expandOnce ty
+                          ty -> ty
                 actTy = TRecord $ map (\(s, expr) -> (Sym s, typeCheck tab expr)) fields
 typeCheck tab@(SymTables { typEnv=tTab })
                (AST.Assign pos le re) = if typeCheck tab le =:: typeCheck tab re
@@ -326,3 +365,4 @@ typeCheck tab (AST.Let { AST.letDecls=decls
 -- | Build SymTables from Decls
 buildTable :: [AST.Decl] -> SymTables -> SymTables
 buildTable decls tabs = addDecls tabs decls
+

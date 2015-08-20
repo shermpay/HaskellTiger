@@ -15,6 +15,9 @@ data Type = TInt
           | TUnit
           | TName [(AST.Id, Type)]
 #+END_SRC
+*** Recursive Types
+Example: type intlist = { data : int, rest : intlist }
+TName "intlist" TRecord [("data", TInt), ("rest", TName "intlist" Nothing)]
 
 ** Symbol Tables
 *** Symbol
@@ -48,6 +51,7 @@ Map: Symbol -> Type
    - [ ] test48: Mutual recursion
    - [ ] queen: Type equality
    - [ ] merge: Type equality
+     Recursive functions, Recursive types
      
 ** Error Messages
    Needs work.
