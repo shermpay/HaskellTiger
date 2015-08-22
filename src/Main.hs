@@ -47,7 +47,8 @@ handleOpt (PrintAST f) = do
 handleOpt (SymbolTables f) = do
   let symTables = Semantics.newSymTables
   prog <- parseFile f
-  putStrLn $ show $ Semantics.analyze prog symTables
+  ty <- Semantics.analyze prog symTables
+  putStrLn $ show ty
 handleOpt Help = usage
          
 -- | Print usage string
