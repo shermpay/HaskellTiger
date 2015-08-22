@@ -275,6 +275,11 @@ typeCheck tab (AST.FieldDeref pos re (AST.IdExpr _ field)) = do
   case recTy of
     -- TODO: Assuming same order now
     TRecord fields _ -> case List.lookup (Sym field) fields of
+                      Just (TName _ ref) -> do
+                        maybeTy <- IORef.readIORef ref
+                        case maybeTy of
+                          Just ty -> return ty
+                          Nothing -> putErr pos "record type invalid" TFail
                       Just ty -> return ty
                       Nothing -> newErr pos "record does not have field"
     _ -> newErr pos "Deref requires record type"
@@ -393,16 +398,18 @@ typeCheck tab AST.While { AST.whileTest=t
         (_, TUnit) -> newErr pos "while test type not int"
         (TInt, _) -> newErr pos "while body cannot have value"
         (_, _) -> newErr pos "while test type not int and body cannot have value"
-typeCheck tab AST.For { AST.forVarName=_
+typeCheck tab AST.For { AST.forVarName=vn
                       , AST.forVarExpr=ve
                       , AST.toExpr=vt
                       , AST.doExpr=d
                       , AST.forPos=pos } = do
   veTy <- typeCheck tab ve
   vtTy <- typeCheck tab vt
+  let newEnv = SymTables{valEnv=addString vn veTy (valEnv tab)
+                        ,typEnv=(typEnv tab)}
   case (veTy, vtTy) of
         (TInt, TInt) -> do
-                      doTy <- typeCheck tab d
+                      doTy <- typeCheck newEnv d
                       case doTy of
                           TUnit -> return TUnit
                           _ -> newErr pos "For loop body cannot have value"
