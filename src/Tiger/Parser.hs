@@ -369,20 +369,14 @@ makeOpParser op = do
   return $ InfixOp pos op
 
 operators :: [[Operator String () Data.Functor.Identity.Identity Expr]]
-operators = [ [Infix (makeOpParser Mul) AssocLeft]
-            , [Infix (makeOpParser Div) AssocLeft]
-            , [Infix (makeOpParser Add) AssocLeft]
-            , [Infix (makeOpParser Sub) AssocLeft]
-            , [Infix (makeOpParser And) AssocLeft]
-            , [Infix (makeOpParser Or) AssocLeft]
-            , [Infix (makeOpParser Eq) AssocLeft]
-            , [Infix (makeOpParser NotEq) AssocLeft]
-            , [Infix (makeOpParser Greater) AssocLeft]
-            , [Infix (makeOpParser Less) AssocLeft]
-            , [Infix (makeOpParser GreaterEq) AssocLeft]
-            , [Infix (makeOpParser LessEq) AssocLeft]
-            ]
-
+operators = [ [Infix (makeOpParser Mul) AssocLeft, Infix (makeOpParser Div) AssocLeft]
+            , [Infix (makeOpParser Add) AssocLeft, Infix (makeOpParser Sub) AssocLeft]
+            , [Infix (makeOpParser Eq) AssocLeft, Infix (makeOpParser NotEq) AssocLeft]
+            , [Infix (makeOpParser Greater) AssocLeft
+              , Infix (makeOpParser Less) AssocLeft
+              , Infix (makeOpParser GreaterEq) AssocLeft
+              , Infix (makeOpParser LessEq) AssocLeft]
+            , [Infix (makeOpParser And) AssocLeft, Infix (makeOpParser Or) AssocLeft]] 
 exprParser :: Parser Expr
 exprParser = buildExpressionParser operators genExprParser
 

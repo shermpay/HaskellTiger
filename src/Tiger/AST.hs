@@ -210,11 +210,7 @@ showExpr indent (Call _ f a) = makeIndent indent
                                makeIndent (inc indent)
                                "ARGS\n" ++ showExprs (dinc indent) a
 showExpr indent (InfixOp _ op e1 e2) = 
-    showExpr indent e1 ++ "\n" ++ makeIndent indent (showOp op) ++ "\n" ++ 
-    showExpr indent e2
-    -- makeIndent indent (show op) ++
-    --                               ('\n':showExpr (inc indent) e1) ++
-    --                               ('\n':showExpr (inc indent) e2)
+    makeIndent indent ("(" ++ (showExpr 0 e1)) ++ (showOp op) ++ showExpr 0 e2 ++ ")"
 showExpr indent (If test te ee _) = makeIndent indent ("IF\n" ++
                                     showExpr (inc indent) test) ++ "\n" ++
 
