@@ -81,7 +81,14 @@ primitivesMap = Map.fromList [(Sym "int", TInt)
 builtinsMap :: Map.Map Sym Type
 builtinsMap = Map.fromList [ (Sym "print", TFunc [TString] Nothing)
                            , (Sym "getchar", TFunc [] $ Just TString)
-                           , (Sym "ord", TFunc [TString] $ Just TInt) ] 
+                           , (Sym "ord", TFunc [TString] $ Just TInt)
+                           , (Sym "flush", TFunc [] Nothing)
+                           , (Sym "chr", TFunc [TInt] $ Just TString)
+                           , (Sym "size", TFunc [TString] $ Just TInt)
+                           , (Sym "substring", TFunc [TString, TInt, TInt] $ Just TString)
+                           , (Sym "concat", TFunc [TString, TString] $ Just TString)
+                           , (Sym "not", TFunc [TInt] $ Just TInt)
+                           , (Sym "exit", TFunc [TInt] Nothing) ] 
 
 -- | Takes an AST.Type and converts it to a Type
 -- Returns TName Sym Nothing if cannot find corresponding type
