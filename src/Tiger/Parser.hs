@@ -80,7 +80,7 @@ typeFieldParser :: Parser FieldType
 typeFieldParser = do
   ident <- identifier
   reservedOp ":"
-  typeId <- typeIdParser
+  typeId <- identifier
   return (ident, typeId)
 
 typeFieldsParser :: Parser RecordType
@@ -94,7 +94,7 @@ typeRecordParser = do
 typeArrayParser :: Parser Type
 typeArrayParser = do
   reserved "array of"
-  typeId <- typeIdParser
+  typeId <- identifier
   return $ ArrayType typeId
 
 typeValParser :: Parser Type
@@ -120,10 +120,10 @@ readTypeDecl input =
 ---------------------------
 -- Variable Declarations --
 ---------------------------
-typeAnnParser :: Parser Type
+typeAnnParser :: Parser TypeId
 typeAnnParser = do
   reservedOp ":"
-  typeId <- typeIdParser
+  typeId <- identifier
   return typeId
 
 varDeclParser :: Parser Decl

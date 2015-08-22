@@ -13,6 +13,7 @@ commentary with @some markup@.
 -}
 module Tiger.AST
     ( Id
+    , TypeId
     , Prog (Prog)
     , Op (..)
     , Type (..)
@@ -29,6 +30,7 @@ import Data.List as List
 import Text.Parsec.Pos (SourcePos, newPos, initialPos)
 
 type Id = String
+type TypeId = String
 
 ---------------
 -- Operators --
@@ -63,17 +65,17 @@ showOp Or        = "|"
 -----------------------
 -- Type Declarations --
 -----------------------
-type FieldType = (Id, Type)
+type FieldType = (Id, TypeId)
 type RecordType = [FieldType]
-data Type = Type Id                 -- Simple Type
+data Type = Type TypeId                 -- Simple Type
           | RecordType RecordType -- Record Type (Field, Type)
-          | ArrayType Type
+          | ArrayType TypeId
             deriving (Show, Eq)
 
 -------------------------------------
 -- Function/Procedure Declarations --
 -------------------------------------
-data FunctionType = FuncType Id RecordType Type
+data FunctionType = FuncType Id RecordType TypeId
                   | ProcType Id RecordType
                     deriving (Show, Eq)
 
@@ -81,7 +83,7 @@ data FunctionType = FuncType Id RecordType Type
 -- Declarations --
 ------------------
 data Decl = VarDecl { varName :: Id
-                    , varType :: Maybe Type
+                    , varType :: Maybe TypeId
                     , varExpr :: Expr
                     , varPos  :: SourcePos }
           | FunctionDecl SourcePos FunctionType Expr
@@ -161,7 +163,7 @@ instance ASTNode Expr where
 
 -- This requires flexible instances
 instance ASTNode FieldType where
-    showData (ident, ty) = ident ++ " : " ++ (showData ty)
+    showData (ident, ty) = ident ++ " : " ++ ty
 
 instance ASTNode Type where
     showData (Type ty) = ty
@@ -264,7 +266,7 @@ showExpr indent e = makeIndent indent (showData e)
 showType :: Int -> Type -> String
 showType indent (Type typeId) = makeIndent indent typeId
 showType indent (RecordType ty) = showRecType indent ty
-showType indent (ArrayType ty) = showType indent ty 
+showType indent (ArrayType ty) = makeIndent indent ty 
                                  
 showDecl :: Int -> Decl -> String
 showDecl indent (VarDecl i ty e _) = makeIndent indent
@@ -275,7 +277,7 @@ showDecl indent (VarDecl i ty e _) = makeIndent indent
                                    where maybeTypeStr = 
                                              case ty of
                                                Just t -> " : "
-                                                         ++ showData t
+                                                         ++ t
                                                Nothing -> ""
 showDecl indent (FunctionDecl _ funtype e) = makeIndent indent
                                            "FUNCTION_DECL\n" ++
@@ -292,7 +294,7 @@ showFuncType indent (FuncType funcId rectype rettype) =
       "FUNCTION " ++ funcId ++ "\n" ++
       makeIndent (inc indent) "PARAMS\n" ++ showRecType (inc indent) rectype ++
                      makeIndent (inc indent)
-                                    "RET\n" ++ showType (dinc indent) rettype
+                                    "RET\n" ++ makeIndent (dinc indent) rettype
 showFuncType indent (ProcType procId rectype) =
     makeIndent indent "PROC " ++ procId ++ "\n" ++
     makeIndent (inc indent) "PARAMS\n" ++ showRecType (inc indent) rectype
