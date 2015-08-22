@@ -19,6 +19,7 @@ import qualified Data.Either as Either
 import qualified Data.IORef as IORef
 import qualified Data.Unique as Uniq
 import qualified Control.Monad as Monad
+import qualified Control.Exception as Except
 import qualified System.IO.Unsafe as Unsafe
 
 import Text.Parsec.Pos (SourcePos, newPos, initialPos)
@@ -32,11 +33,12 @@ import qualified Tiger.AST as AST
 data Type = TInt
           | TString
           | TRecord [(Sym, Type)] Uniq.Unique
-          | TArray Type
+          | TArray Type Uniq.Unique
           | TNil
           | TUnit
           | TFunc [Type] (Maybe Type)
           | TName Sym (IORef.IORef (Maybe Type))
+          | TFail                -- Special type used in error case
             deriving (Show, Eq)
             -- deriving (Eq)
 
@@ -58,6 +60,9 @@ resolveType _ primTy = return primTy
 (=::) TNil (TRecord  _ _) = True
 (=::) (TRecord _ _) TNil = True
 (=::) (TRecord _ x) (TRecord _ y) = x == y
+(=::) (TArray _ x) (TArray _ y) = x == y
+(=::) TFail _ = True
+(=::) _ TFail = True
 (=::) t1 t2 = t1 == t2
 
 tyListEq :: [Type] -> [Type] -> Bool
@@ -81,14 +86,16 @@ builtinsMap = Map.fromList [
 -- Returns TName Sym Nothing if cannot find corresponding type
 typeFromAST ::  SymTable -> AST.Type -> IO Type
 typeFromAST (SymTable tab) (AST.Type ident) = case Map.lookup (Sym ident) tab of
-                                                Just x -> return x
+                                                Just ty -> return ty
                                                 Nothing -> do
                                                     ref <- IORef.newIORef Nothing
                                                     return $ TName (Sym ident) ref
 typeFromAST tab (AST.RecordType recty) = do
   unique <- Uniq.newUnique 
   return $ TRecord (map (\(ident, tyId) -> (Sym ident, getString tyId tab)) recty) unique
-typeFromAST tab (AST.ArrayType arrty) = return $ TArray $ getString arrty tab
+typeFromAST tab (AST.ArrayType arrty) = do
+  unique <- Uniq.newUnique 
+  return $ TArray (getString arrty tab) unique
                                    
 -- | Sym represents a Symbol in the SymTable
 newtype Sym = Sym String deriving (Eq, Ord, Show)
@@ -172,7 +179,7 @@ addDecl tab@(SymTables { valEnv=ve
 addDecl tab@(SymTables { valEnv=t
                        , typEnv=te })
             (AST.TypeDecl pos ident tyNode) = do
-              ty <- typeFromAST te tyNode
+              ty <- typeFromAST te tyNode >>= resolveType te
               return $SymTables { valEnv=t
                                 , typEnv=
                                     case existing of
@@ -187,24 +194,24 @@ addDecl tab@(SymTables { valEnv=ve
     = case funcTy of
            AST.FuncType ident paramTy retTyId -> do
                     bodyTy <- typeCheck env body
+                    newValEnv <- addFunc ident fTy
+                    if retTy =:: bodyTy
+                    then return fTy
+                    else putErr pos "Function body return type mismatch" fTy
                     return $
-                           SymTables { valEnv=addFunc ident
-                                       (if retTy =:: bodyTy
-                                        then fTy
-                                        else newErr pos
-                                        "Function body return type mismatch")
-                              , typEnv=te }
+                           SymTables { valEnv=newValEnv, typEnv=te }
                    where vEnv = newEnv paramTy
                          env = SymTables { valEnv=addString ident fTy vEnv, typEnv=te }
                          retTy = getString retTyId te
                          fTy = TFunc (createFormals vEnv paramTy) (Just retTy)
            AST.ProcType ident paramTy -> do
                     bodyTy <- typeCheck env body
+                    newValEnv <- addFunc ident fTy
+                    if TUnit =:: bodyTy
+                    then return fTy
+                    else putErr pos "Procedure body cannot have value" fTy
                     return $
-                           SymTables { valEnv=addFunc ident
-                                       (if TUnit =:: bodyTy
-                                        then fTy
-                                        else newErr pos "Procedure body cannot have value")
+                           SymTables { valEnv=newValEnv
                                      , typEnv=te }
                    where vEnv = newEnv paramTy
                          env = SymTables { valEnv=addString ident fTy vEnv, typEnv=te }
@@ -219,8 +226,8 @@ addDecl tab@(SymTables { valEnv=ve
                                               Just t -> t
                                               Nothing -> newErr pos "Type does not exist")
             addFunc idt func = case lookupString idt ve of
-                                 Just _ -> newErr pos ("Redeclaring function: " ++ idt)
-                                 Nothing -> addString idt func ve
+                                 Just _ -> putErr pos ("Redeclaring function: " ++ idt) ve
+                                 Nothing -> return $ addString idt func ve
 
 -- | Add a list of Decls to SymTables
 addDecls :: SymTables -> [AST.Decl] -> IO SymTables
@@ -238,17 +245,20 @@ analyze (AST.Prog prog) tabs = typeCheck tabs prog
 newErr :: SourcePos -> String -> a
 newErr p s = error $ (show p) ++ ": " ++ s      
 
+putErr :: SourcePos -> String -> a -> IO a
+putErr p s v = (putStrLn $ (show p) ++ ": " ++ s) >> return v
+
 typeCheckList :: SymTables -> [AST.Expr] -> IO Type
-typeCheckList tab es = if List.null es
-                         then return TUnit
-                         else last $ map (typeCheck tab) es
+typeCheckList tab es = case es of
+                         [] -> return TUnit
+                         _ -> mapM (typeCheck tab) es >>= return . last
 
 typeCheck :: SymTables -> AST.Expr -> IO Type
 typeCheck SymTables  { valEnv=vt
                      , typEnv=tt } (AST.IdExpr pos idt)
     = case lookupString idt vt of
         Just t -> return t
-        Nothing -> newErr pos ("Cannot resolve type for " ++ show idt)
+        Nothing -> putErr pos ("Cannot resolve type for " ++ show idt) TFail
 typeCheck tab (AST.FieldDeref pos re (AST.IdExpr _ field)) = do
   recTy <- typeCheck tab re
   case recTy of
@@ -262,9 +272,9 @@ typeCheck tab@(SymTables{typEnv=t}) (AST.ArraySub pos arr e) = do
   arrTy <- typeCheck tab arr
   sizeTy <- typeCheck tab e
   case arrTy of
-    TArray ty -> if  sizeTy =:: TInt
-                 then return ty
-                 else newErr pos "Array subscript not int"
+    TArray ty _ -> if  sizeTy =:: TInt
+                   then return ty
+                   else newErr pos "Array subscript not int"
     _ -> newErr pos "Subscript requires array type"
 typeCheck _ (AST.Nil _) = return TNil
 typeCheck _ (AST.IntConst _ _) = return TInt
@@ -310,11 +320,11 @@ typeCheck tab AST.NewArr { AST.arrayType=(AST.Type idt)
   arrSizeTy <- typeCheck tab arrSize
   case arrSizeTy of
     TInt -> if arrTy =:: initTy
-            then return $ TArray initTy
+            then return ty
             else newErr pos ("Array initialization expression type mismatch" ++
                              "\nexpected: " ++ show arrTy ++
                              "\nactual:   " ++ show initTy)
-      where (TArray arrTy) = getString idt (typEnv tab)
+      where ty@(TArray arrTy _) = getString idt (typEnv tab)
     _ -> newErr pos "Array size has to be integer"
 typeCheck tab@(SymTables { valEnv=_
                          , typEnv=tTab })

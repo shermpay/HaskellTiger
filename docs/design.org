@@ -28,6 +28,8 @@ Map: Symbol -> Type
 Map: Symbol -> Type
 ** Testcases
    - [ ] test5: Valid recursive record
+   - [ ] test6: Valid mutually recursive functions
+   - [ ] test7: Valid mutually recursive functions
    - [ ] test16: mutually recursive types that do not pass through record
    - [X] test23: hmmm...
      lValue parser should not parse assign
@@ -35,9 +37,9 @@ Map: Symbol -> Type
    - [X] test25: hmmm...
    - [X] test31: type constaint and init value defer
    - [X] test32: type constaint and array init expr defer
-   - [ ] test32: Error not being evaluated. Therefore error not thrown.
+   - [X] test32: Error not being evaluated. Therefore error not thrown.
    - [X] test33: unknown rec type
-   - [ ] test33: Error not being evaluated. Therefore error not thrown.
+   - [X] test33: Error not being evaluated. Therefore error not thrown.
    - [X] test37: redeclaration
    - [X] test38: redeclaring types are illegal
    - [X] test39: redeclaring functions are illegal

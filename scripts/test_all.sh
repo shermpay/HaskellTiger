@@ -66,11 +66,14 @@ for f in ${TIGER_FLAGS[@]}; do
         print '+ Passed:\t'$num_passed
         print '+ Failed:\t'$(( $total - $num_passed ))
         print 'Following tests failed:'
+        tmp_file=$(mktemp)
         for t in $tests_failed;
         do
             echo "    $t"
+            echo $t >> $tmp_file
         done
-
+        echo "Diffing against ${tmp_file}"
+        diff $PROJ_DIR/docs/semantics_fail_files $tmp_file
         exit 0
     fi
 done

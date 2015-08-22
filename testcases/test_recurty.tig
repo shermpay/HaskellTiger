@@ -1,0 +1,14 @@
+let 
+ type list = {first: int, rest: list}
+ function newlist(n : int) : list =
+    let var i := 0
+     in if n <= 0
+         then list{first=i,rest=newlist(n - 1)}
+         else nil
+    end
+ var lst := newlist(4)
+  /* BODY OF MAIN PROGRAM */
+ in 
+ lst
+end
+

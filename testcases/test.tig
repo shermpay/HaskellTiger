@@ -1,10 +1,6 @@
 
 let
-	type Point = {x : int, y : int} 
-        type intarr = array of int
-	type Vector = {elts : intarr, size : int}
-	var p := Point {x=0, y=0}
-	var v := Vector{elts=intarr[8] of 0, size=8}
+        function f(a : int) : int = a
+        function g(b : int) : int = (f(a); b)
 in
-	v.elts[0]
 end
