@@ -31,6 +31,7 @@ Map: Symbol -> Type
    - [ ] test6: Valid mutually recursive functions
    - [ ] test7: Valid mutually recursive functions
    - [ ] test16: mutually recursive types that do not pass through record
+   - [ ] test17: mutually recursive types interrupted
    - [X] test23: hmmm...
      lValue parser should not parse assign
    - [X] test24: hmmm...
@@ -44,9 +45,11 @@ Map: Symbol -> Type
    - [X] test38: redeclaring types are illegal
    - [X] test39: redeclaring functions are illegal
      Also sym tables from arg list missing in function body
+   - [ ] test40: error propogation
    - [X] test42: Type equality
    - [X] test44: Nil and record compatibility
-   - [X] test45: Nil and record compatibility
+   - [ ] test45: Nil and record compatibility, Nil needs to be constrained
+     Error propogation
    - [X] test46: Nil and record compatibility
      Record equality
    - [ ] test47: Mutual recursion

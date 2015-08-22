@@ -48,7 +48,9 @@ handleOpt (SymbolTables f) = do
   let symTables = Semantics.newSymTables
   prog <- parseFile f
   ty <- Semantics.analyze prog symTables
-  putStrLn $ show ty
+  case ty of
+    Semantics.TFail -> error "Compiler Errors"
+    _ -> putStrLn $ show ty
 handleOpt Help = usage
          
 -- | Print usage string

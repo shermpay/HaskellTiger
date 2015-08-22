@@ -155,26 +155,22 @@ addDecl tab@(SymTables { valEnv=ve
                     , AST.varExpr=expr
                     , AST.varPos=pos }) = do
               exTy <- typeCheck tab expr
-              let existing = lookupString vName ve
               let checkAnn annNode = if exTy =:: vt
-                                     then Either.Right $ addString vName exTy ve
-                                     else Either.Left $ ("Expr and ann type mismatch" ++
-                                                         "\nExpr: " ++ show vt ++
-                                                         "\nAnn: " ++ show exTy)
+                                     then return $ addString vName exTy ve
+                                     else putErr pos
+                                              ("Expr and ann type mismatch" ++
+                                               "\nExpr: " ++ show vt ++
+                                               "\nAnn: " ++ show exTy)
+                                              ve
                                          where vt = getString annNode t
-              let newValEnv = case existing of
-                        Just ty -> if exTy =:: ty
-                                   then case mAnnType of
-                                          Just annType -> checkAnn annType
-                                          Nothing -> Either.Right $ ve
-                                   else Either.Left "Cannot assign incompatible types"
-                        Nothing -> case mAnnType of
-                                     Just annType -> checkAnn annType
-                                     Nothing -> Either.Right $ addString vName exTy ve
-              -- Body
-              case newValEnv of
-                Either.Right x -> return $ SymTables { valEnv=x, typEnv=t }
-                Either.Left errMsg -> newErr pos errMsg
+              newValEnv <- case mAnnType of
+                             Just annType -> checkAnn annType
+                             Nothing -> case exTy of
+                                          TNil -> putErr pos
+                                                  "Nil expression needs to be annotated"
+                                                  (addString vName exTy ve)
+                                          _ -> return $ addString vName exTy ve
+              return $ SymTables { valEnv=newValEnv, typEnv=t }
             
 addDecl tab@(SymTables { valEnv=t
                        , typEnv=te })
@@ -206,10 +202,11 @@ addDecl tab@(SymTables { valEnv=ve
                          fTy = TFunc (createFormals vEnv paramTy) (Just retTy)
            AST.ProcType ident paramTy -> do
                     bodyTy <- typeCheck env body
-                    newValEnv <- addFunc ident fTy
-                    if TUnit =:: bodyTy
-                    then return fTy
-                    else putErr pos "Procedure body cannot have value" fTy
+                    funTy <- if TUnit =:: bodyTy
+                             then return fTy
+                             -- TFail or fTy testcase40
+                             else putErr pos "Procedure body cannot have value" fTy
+                    newValEnv <- addFunc ident funTy
                     return $
                            SymTables { valEnv=newValEnv
                                      , typEnv=te }
