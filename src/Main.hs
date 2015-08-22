@@ -9,6 +9,7 @@ import System.Exit
 
 import qualified Tiger.AST as AST
 import qualified Tiger.Parser as Parser
+import qualified Tiger.Types as Ty
 import qualified Tiger.Semantics as Semantics
     
 -- | Command line flags
@@ -49,7 +50,7 @@ handleOpt (SymbolTables f) = do
   prog <- parseFile f
   ty <- Semantics.analyze prog symTables
   case ty of
-    Semantics.TFail -> error "Compiler Errors"
+    Ty.TFail -> error "Compiler Errors"
     _ -> putStrLn $ show ty
 handleOpt Help = usage
          
