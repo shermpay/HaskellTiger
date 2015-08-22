@@ -79,8 +79,9 @@ primitivesMap = Map.fromList [(Sym "int", TInt)
 
 -- | Map of builtin functions
 builtinsMap :: Map.Map Sym Type
-builtinsMap = Map.fromList [
-               (Sym "print", TFunc [TString] Nothing)] 
+builtinsMap = Map.fromList [ (Sym "print", TFunc [TString] Nothing)
+                           , (Sym "getchar", TFunc [] $ Just TString)
+                           , (Sym "ord", TFunc [TString] $ Just TInt) ] 
 
 -- | Takes an AST.Type and converts it to a Type
 -- Returns TName Sym Nothing if cannot find corresponding type
@@ -175,7 +176,13 @@ addDecl tab@(SymTables { valEnv=ve
 addDecl tab@(SymTables { valEnv=t
                        , typEnv=te })
             (AST.TypeDecl pos ident tyNode) = do
-              ty <- typeFromAST te tyNode >>= resolveType te
+              ref <- IORef.newIORef Nothing
+              let tempTe = addString ident (TName (Sym ident) ref) te
+              ty <- typeFromAST tempTe tyNode >>= resolveType tempTe
+              IORef.writeIORef ref (Just ty)
+              -- myty <- IORef.readIORef ref
+              -- putStrLn $ show myty
+              -- putStrLn $ show tempTe
               return $SymTables { valEnv=t
                                 , typEnv=
                                     case existing of
@@ -327,20 +334,22 @@ typeCheck tab@(SymTables { valEnv=_
                          , typEnv=tTab })
               (AST.NewRec pos (AST.Type idt) fields) = do
     -- TODO: Currently assumes same ordering
-                actTys <- ioTys
-                if expTys `fieldEq` actTys
+                actTys <- mapM liftTy fields
+                let actTypes = map (\(_, t) -> t) actTys
+                if expTypes `tyListEq` actTypes
                 then return ty
                 else newErr pos ("Record initialization type mismatch" ++
                                  "\nexpected: " ++ (show expTys) ++
                                  "\nactual:   " ++ (show actTys) ++
                                  "\nSymbols: " ++ show tab)
-          where (ty, expTys) = case getString idt (typEnv tab) of
+          where (ty, expTys) = case getString idt tTab of
                            -- (TRecord ty) -> TRecord $ map expandOnce ty
-                                 ty@(TRecord tys _) -> (ty, tys)
-                ioTys = mapM liftTy fields
+                                 recTy@(TRecord tys _) -> (recTy, tys)
                 liftTy (s, expr) = typeCheck tab expr >>= (\x -> return (Sym s, x))
-                fieldEq [] [] = True
-                fieldEq (x:xs) (y:ys) = if x == y then fieldEq xs ys else False
+                expTypes = map (\(_, t) -> case t of
+                                             TName (Sym s) _ -> getString s tTab
+                                             _ -> t)
+                           expTys
 typeCheck tab@(SymTables { typEnv=tTab })
                (AST.Assign pos le re) = do
                  lTy <- typeCheck tab le
