@@ -12,6 +12,7 @@ commentary with @some markup@.
 -}
 -- TODO: Improved error messages
 module Tiger.Types where
+
 import qualified Data.Map as Map
 import qualified Data.IORef as IORef
 import qualified Data.Unique as Uniq

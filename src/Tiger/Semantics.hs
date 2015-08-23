@@ -311,3 +311,13 @@ typeCheck tab (AST.Let { AST.letDecls=decls
 buildTable :: [AST.Decl] -> SymTables -> IO SymTables
 buildTable decls tabs = addDecls tabs decls
 
+progPass :: SymTables -> AST.Prog -> IO ()
+progPass tabs (AST.Prog prog) = do
+  typeCheck tabs prog 
+  return ()
+
+exprHandlers :: [SymTables -> AST.Expr -> IO Ty.Type]
+exprHandlers = [typeCheck]
+
+declHandlers :: [SymTables -> AST.Decl -> IO SymTables]
+declHandlers = [addDecl]
