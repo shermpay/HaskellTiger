@@ -12,7 +12,7 @@ commentary with @some markup@.
 -}
 module Tiger.Tree where
 
-import qualified Tiger.Temporaries as Temp
+import qualified Tiger.Temporary as Temp
 
 type Label = Temp.Label
 

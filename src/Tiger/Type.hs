@@ -11,7 +11,7 @@ Here is a longer description of this module, containing some
 commentary with @some markup@.
 -}
 -- TODO: Improved error messages
-module Tiger.Types where
+module Tiger.Type where
 
 import qualified Data.Map as Map
 import qualified Data.IORef as IORef

@@ -9,7 +9,7 @@ import System.Exit
 
 import qualified Tiger.AST as AST
 import qualified Tiger.Parser as Parser
-import qualified Tiger.Semantics as Semantics
+import qualified Tiger.Semantic as Semantic
     
 -- | Command line flags
 data Flag = Parse IO.FilePath
@@ -45,9 +45,9 @@ handleOpt (PrintAST f) = do
   putStrLn $ AST.showAST (let AST.Prog p = prog in p)
   return ()
 handleOpt (SymbolTables f) = do
-  let symTables = Semantics.newSymTables
+  let symTables = Semantic.newSymTables
   prog <- parseFile f
-  Semantics.progPass symTables prog
+  Semantic.progPass symTables prog
 handleOpt Help = usage
          
 -- | Print usage string

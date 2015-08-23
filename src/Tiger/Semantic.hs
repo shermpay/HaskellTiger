@@ -11,7 +11,7 @@ Here is a longer description of this module, containing some
 commentary with @some markup@.
 -}
 -- TODO: Improved error messages
-module Tiger.Semantics where
+module Tiger.Semantic where
 
 import qualified Data.Map as Map
 import qualified Data.List as List
@@ -27,7 +27,7 @@ import Text.Parsec.Pos (SourcePos, newPos, initialPos)
 import qualified Tiger.AST as AST
 import qualified Tiger.Symbol as Sym
 import Tiger.Types ((=::))
-import qualified Tiger.Types as Ty 
+import qualified Tiger.Type as Ty 
 
 -- | Initialize SymTable with primitive types
 initTypeSymTable :: Sym.Table Ty.Type
