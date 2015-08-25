@@ -6,7 +6,7 @@ import qualified Data.Map as Map
 newtype Sym = Sym String deriving (Eq, Ord, Show)
 
 -- | A Table is a SymbolTable that is generally use for mapping Sym to Type
-newtype (Show a) => Table a = Table (Map.Map Sym a) deriving (Show)
+newtype Table a = Table (Map.Map Sym a) deriving (Show)
 
 -- | Add a Sym => Type mapping in a Table
 addSym :: (Show a) => Sym -> a -> Table a -> Table a
